@@ -1,0 +1,23 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: mservice
+  namespace: rabbitmq-setup
+spec:
+  template:
+    metadata:
+      labels:
+        app: mservice
+    spec:
+      containers:
+        - image: christinedia/routing:svcs    #new
+          env:
+            - name: REDIS_URL
+              value: "my-redis-master.rabbitmq-setup.svc.cluster.local:6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: my-redis
+                  key: redis-password
+            - name: NUM_SERVICES
+              value: "1"

@@ -1,0 +1,33 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: service1
+  namespace: rabbitmq-setup
+spec:
+  template:
+    metadata:
+      labels:
+        app: event-display
+        version: v1
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        autoscaling.knative.dev/metric: "rps"
+        autoscaling.knative.dev/target: "10"
+        autoscaling.knative.dev/scale-to-zero: "true"
+        autoscaling.knative.dev/scale-up-rate: "10.0"
+        autoscaling.knative.dev/panic-window: "10s"
+        autoscaling.knative.dev/panic-threshold-percentage: "200"  # More aggressive scaling
+    spec:
+      containers:
+        - image: christinedia/event-consumer:third
+          resources:
+            limits:
+              cpu: "1000m"
+              memory: "1024Mi"
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+  traffic:
+    - latestRevision: true
+      percent: 100

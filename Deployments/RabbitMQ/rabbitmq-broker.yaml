@@ -1,0 +1,14 @@
+apiVersion: eventing.knative.dev/v1
+kind: Broker
+metadata:
+  name: queue
+  namespace: rabbitmq-setup
+  annotations:
+    eventing.knative.dev/broker.class: RabbitMQBroker
+    #autoscaling.knative.dev/class: "keda.autoscaling.knative.dev"
+    #keda.autoscaling.knative.dev/rabbitMQQueueLength: "1"
+spec:
+  config:
+    apiVersion: eventing.knative.dev/v1alpha1
+    kind: RabbitmqBrokerConfig
+    name: default-config
