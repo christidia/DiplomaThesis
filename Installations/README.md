@@ -69,3 +69,19 @@ To install the latest minikube stable release on x86-64 Linux using binary downl
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
 sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
 ```
+
+# Setting up the Minikube Node
+
+To setup the minikube node and run the experiments, run the script: minikube_setup.sh and perform the following configurations: 
+
+## Edit the Metrics Server Deployment
+Sometimes the metrics server deployment needs to be edited to work correctly in certain environments. You might need to add --kubelet-insecure-tls to the args:
+
+```bash
+kubectl edit deployment metrics-server -n kube-system
+```
+
+Add the following under spec.containers.args:
+```bash
+- --kubelet-insecure-tls
+```
