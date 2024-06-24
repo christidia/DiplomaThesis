@@ -1,5 +1,10 @@
 # Prerequisites
 
+To perform the installations and experiments, ensure that the following are installed and running on the machine:
+- [Java Runtime Enviroment](https://ubuntu.com/tutorials/install-jre#2-installing-openjdk-jre)
+- [Helm](https://helm.sh/docs/intro/install/)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
+   
 ## Docker Installation Guide for Ubuntu
 [Docker Installation Guide for Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 
