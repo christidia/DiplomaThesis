@@ -64,6 +64,7 @@ newgrp docker
 ## Minikube Installation Guide for Ubuntu
 [Minikube Installation Guide for Ubuntu](https://minikube.sigs.k8s.io/docs/start/?arch=%2Flinux%2Fx86-64%2Fstable%2Fbinary+download)
 
+To install the latest minikube stable release on x86-64 Linux using binary download:
 ```bash
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
 sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
