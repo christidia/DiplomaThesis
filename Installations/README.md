@@ -72,7 +72,7 @@ sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-a
 
 # Setting up the Minikube Node
 
-To setup the minikube node and run the experiments, run the script: minikube_setup.sh and perform the following configurations: 
+To setup the minikube node and run the experiments, run the script: [minikube_setup.sh](./minikube_setup.sh) and perform the following configurations: 
 
 ## Edit the Metrics Server Deployment
 Sometimes the metrics server deployment needs to be edited to work correctly in certain environments. You might need to add --kubelet-insecure-tls to the args:
