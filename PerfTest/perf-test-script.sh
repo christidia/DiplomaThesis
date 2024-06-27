@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Set this variable to point to the path where the repo is saved
+HOME = "/home/ubuntu"
+
+
 # Function to start port forwarding and set up cleanup on exit
 start_port_forwarding() {
   kubectl -n rabbitmq-setup port-forward rabbitmq-server-0 5672:5672 &
@@ -54,7 +58,7 @@ RABBITMQ_VHOST="/"
 # Test parameters
 MESSAGE_RATE=10
 PRODUCER_COUNT=2
-BODY_DIR="/home/dspath/christina/yolo/test_images/payloads"
+BODY_DIR="$HOME/DiplomaThesis/GoApps/cloudevents/payloads"
 BODY_CONTENT_TYPE="application/json"
 EXCHANGE_NAME="eventing-rabbitmq-source"
 MESSAGE_TYPE="headers"
@@ -72,7 +76,7 @@ if [ -z "$BODY_PATH" ]; then
 fi
 
 # Ensure the path to the PerfTest jar is correct
-PERF_TEST_JAR="/home/dspath/christina/perf-test-latest.jar"
+PERF_TEST_JAR="$HOME/DiplomaThesis/PerfTest/perf-test.jar"
 
 # Check if the PerfTest jar file exists
 if [ ! -f "$PERF_TEST_JAR" ]; then
