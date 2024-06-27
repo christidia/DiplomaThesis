@@ -31,13 +31,9 @@ var (
 	rabbitMQURLhttp   string
 	rabbitMQUser      string
 	rabbitMQPass      string
-	redisURL          string
-	redisPass         string
 	checkInterval     = 1000 * time.Millisecond // Adjust the interval as needed
 	isPreviouslyEmpty = true
-	serviceKeyPrefix  = "service:" // Prefix for service keys to avoid conflicts
-	initialTkOffset   = -100       // Initialize `tk` to current time minus 100 seconds
-	mutex             sync.Mutex   // Mutex to synchronize access to shared state
+	mutex             sync.Mutex // Mutex to synchronize access to shared state
 )
 
 func init() {
