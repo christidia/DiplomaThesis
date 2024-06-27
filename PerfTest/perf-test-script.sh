@@ -1,8 +1,9 @@
 #!/bin/bash
 
+set -e
+
 # Set this variable to point to the path where the repo is saved
 HOME="/home/ubuntu"
-
 
 # Function to start port forwarding and set up cleanup on exit
 start_port_forwarding() {
