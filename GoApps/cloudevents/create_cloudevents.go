@@ -22,7 +22,7 @@ type CloudEventData struct {
 
 func main() {
 	// Specify the directory containing images and the output file for CloudEvents
-	dirPath := "~/christina/yolo/test_images"
+	dirPath := "/test_images"
 	outputFile := "events.json"
 
 	// Expand the tilde (~) in the file path
