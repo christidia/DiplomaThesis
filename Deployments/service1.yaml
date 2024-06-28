@@ -26,10 +26,10 @@ spec:
               value: "1"
           resources:
             limits:
-              cpu: "10000m"       # 10 CPU cores
+              cpu: "4000m"       # 10 CPU cores
               memory: "2200Mi"    # 2.2 GiB
             requests:
-              cpu: "8000m"        # 8 CPU cores
+              cpu: "2000m"        # 8 CPU cores
               memory: "1700Mi"    # 1.7 GiB
   traffic:
     - latestRevision: true
