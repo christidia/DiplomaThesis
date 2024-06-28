@@ -24,13 +24,13 @@ spec:
           env:
             - name: QUEUE_SIZE
               value: "1"
-          resources:
-            limits:
-              cpu: "1000m"
-              memory: "512Mi"
-            requests:
-              cpu: "1000m"
-              memory: "512Mi"
+          # resources:
+          #   limits:
+          #     cpu: "1000m"
+          #     memory: "512Mi"
+          #   requests:
+          #     cpu: "1000m"
+          #     memory: "512Mi"
   traffic:
     - latestRevision: true
       percent: 100
