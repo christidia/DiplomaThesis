@@ -21,13 +21,16 @@ spec:
     spec:
       containers:
         - image: christinedia/event-consumer:opencv4   #third
+          env:
+            - name: QUEUE_SIZE
+              value: "1"
           resources:
             limits:
               cpu: "1000m"
-              memory: "1024Mi"
+              memory: "512Mi"
             requests:
-              cpu: "200m"
-              memory: "256Mi"
+              cpu: "1000m"
+              memory: "512Mi"
   traffic:
     - latestRevision: true
       percent: 100
