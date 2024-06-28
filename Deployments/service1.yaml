@@ -26,11 +26,11 @@ spec:
               value: "1"
           resources:
             limits:
-              cpu: "1000m"       # 4 CPU cores
-              memory: "1100Mi"    # 2.2 GiB
+              cpu: "500m"       # 4 CPU cores
+              memory: "512Mi"    # 2.2 GiB
             requests:
               cpu: "500m"        # 2 CPU cores
-              memory: "850Mi"    # 1.7 GiB
+              memory: "512Mi"    # 1.7 GiB
   traffic:
     - latestRevision: true
       percent: 100
