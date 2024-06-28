@@ -26,7 +26,7 @@ spec:
               value: "1"
           resources:
             limits:
-              cpu: "2000m"       # 4 CPU cores
+              cpu: "4000m"       # 4 CPU cores
               memory: "1024Mi"    # 2.2 GiB
             requests:
               cpu: "500m"        # 2 CPU cores
