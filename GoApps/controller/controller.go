@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -34,7 +33,6 @@ var (
 	rabbitMQPass      string
 	checkInterval     time.Duration
 	isPreviouslyEmpty = true
-	mutex             sync.Mutex // Mutex to synchronize access to shared state
 )
 
 func init() {
@@ -116,7 +114,6 @@ func pollQueue(queueName string, ch *amqp.Channel, done chan bool) {
 			if err != nil {
 				log.Printf("Error checking queue: %v\n", err)
 			} else {
-				mutex.Lock()
 				if messageCount == 0 && !isPreviouslyEmpty {
 					log.Printf("Queue %s is now empty\n", queueName)
 					isPreviouslyEmpty = true
@@ -125,7 +122,6 @@ func pollQueue(queueName string, ch *amqp.Channel, done chan bool) {
 					isPreviouslyEmpty = false
 					log.Printf("Queue %s has %d messages\n", queueName, messageCount)
 				}
-				mutex.Unlock()
 			}
 			time.Sleep(checkInterval)
 		}
