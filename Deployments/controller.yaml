@@ -25,6 +25,8 @@ spec:
                 secretKeyRef:
                   name: rabbitmq-default-user
                   key: password
+            - name: CHECK_INTERVAL
+              value: "5000"
           readinessProbe:
             successThreshold: 1
             tcpSocket:
