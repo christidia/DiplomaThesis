@@ -1,0 +1,33 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: queue-control
+  namespace: rabbitmq-setup
+spec:
+  template:
+    metadata:
+      labels:
+        app: queue-control
+    spec:
+      containers:
+        - image: christinedia/controller:queueonly
+          name: user-container
+          env:
+            - name: RABBITMQ_URL
+              value: "http://rabbitmq.rabbitmq-setup.svc.cluster.local:15672/api/queues"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: username
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: password
+          readinessProbe:
+            successThreshold: 1
+            tcpSocket:
+              port: 8080
+          ports:
+            - containerPort: 8080

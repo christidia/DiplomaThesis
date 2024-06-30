@@ -1,14 +1,14 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: service1
+  name: service2
   namespace: rabbitmq-setup
 spec:
   template:
     metadata:
       labels:
         app: event-display
-        version: v1
+        version: v2
       # annotations:
       #   autoscaling.knative.dev/minScale: "1"
       #   autoscaling.knative.dev/maxScale: "10"
@@ -26,8 +26,8 @@ spec:
               value: "1"
           resources:
             limits:
-              cpu: "1000m"       # 4 CPU cores
-              memory: "2048Mi"    # 2.2 GiB
+              cpu: "4000m"       # 4 CPU cores
+              memory: "3072Mi"    # 2.2 GiB
             requests:
               cpu: "500m"        # 2 CPU cores
               memory: "1024Mi"    # 1.7 GiB
