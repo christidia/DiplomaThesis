@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -31,7 +32,7 @@ var (
 	rabbitMQURLhttp   string
 	rabbitMQUser      string
 	rabbitMQPass      string
-	checkInterval     = 1000 * time.Millisecond // Adjust the interval as needed
+	checkInterval     time.Duration
 	isPreviouslyEmpty = true
 	mutex             sync.Mutex // Mutex to synchronize access to shared state
 )
@@ -53,11 +54,30 @@ func init() {
 	// Construct RabbitMQ URL with username and password
 	rabbitMQURL = fmt.Sprintf("amqp://%s:%s@rabbitmq.rabbitmq-setup.svc.cluster.local:5672/",
 		rabbitMQUser, rabbitMQPass)
+	log.Printf("Constructed RabbitMQ URL: %s", rabbitMQURL)
+
+	// Set checkInterval from environment variable or use default
+	checkInterval = getCheckIntervalFromEnv("CHECK_INTERVAL", 5000) * time.Millisecond
+}
+
+func getCheckIntervalFromEnv(envVar string, defaultValue int) time.Duration {
+	intervalStr := os.Getenv(envVar)
+	if intervalStr == "" {
+		return time.Duration(defaultValue)
+	}
+	interval, err := strconv.Atoi(intervalStr)
+	if err != nil || interval <= 0 {
+		log.Printf("Invalid value for %s: %s. Using default: %dms", envVar, intervalStr, defaultValue)
+		return time.Duration(defaultValue)
+	}
+	return time.Duration(interval)
 }
 
 func findQueueWithPrefix(prefix string) (string, error) {
 	request := gorequest.New()
-	resp, body, errs := request.Get(rabbitMQURLhttp).
+	// Update the URL to include the management API endpoint
+	apiURL := fmt.Sprintf("http://rabbitmq.rabbitmq-setup.svc.cluster.local:15672/api/queues")
+	resp, body, errs := request.Get(apiURL).
 		SetBasicAuth(rabbitMQUser, rabbitMQPass).
 		End()
 
@@ -100,9 +120,7 @@ func pollQueue(queueName string, ch *amqp.Channel, done chan bool) {
 				if messageCount == 0 && !isPreviouslyEmpty {
 					log.Printf("Queue %s is now empty\n", queueName)
 					isPreviouslyEmpty = true
-
 					go updateEmptyQWeightRoutine()
-
 				} else if messageCount > 0 {
 					isPreviouslyEmpty = false
 					log.Printf("Queue %s has %d messages\n", queueName, messageCount)
@@ -119,17 +137,15 @@ func checkQueue(queueName string, ch *amqp.Channel) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to inspect queue: %v", err)
 	}
-
 	return queue.Messages, nil
 }
 
 func updateEmptyQWeightRoutine() {
 	log.Println("Starting updateEmptyQWeightRoutine")
-
+	// Implement the logic for updating EmptyQWeight here
 }
 
 func main() {
-
 	// Find the queue name with the specified prefix
 	queueName, err := findQueueWithPrefix("rabbitmq-setup.event-trigger.")
 	if err != nil {
@@ -138,6 +154,7 @@ func main() {
 	if queueName == "" {
 		log.Fatalf("Queue with prefix 'rabbitmq-setup.event-trigger.' not found")
 	}
+	log.Printf("Found queue with name: %s", queueName)
 
 	// Set up RabbitMQ connection and channel
 	conn, ch, err := setupRabbitMQ()
