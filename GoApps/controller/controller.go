@@ -56,6 +56,7 @@ func init() {
 
 	// Set checkInterval from environment variable or use default
 	checkInterval = getCheckIntervalFromEnv("CHECK_INTERVAL", 5000) * time.Millisecond
+	log.Printf("Check interval set to: %s", checkInterval)
 }
 
 func getCheckIntervalFromEnv(envVar string, defaultValue int) time.Duration {
@@ -114,13 +115,13 @@ func pollQueue(queueName string, ch *amqp.Channel, done chan bool) {
 			if err != nil {
 				log.Printf("Error checking queue: %v\n", err)
 			} else {
+				log.Printf("Queue %s has %d messages\n", queueName, messageCount)
 				if messageCount == 0 && !isPreviouslyEmpty {
 					log.Printf("Queue %s is now empty\n", queueName)
 					isPreviouslyEmpty = true
 					go updateEmptyQWeightRoutine()
 				} else if messageCount > 0 {
 					isPreviouslyEmpty = false
-					log.Printf("Queue %s has %d messages\n", queueName, messageCount)
 				}
 			}
 			time.Sleep(checkInterval)
@@ -129,6 +130,7 @@ func pollQueue(queueName string, ch *amqp.Channel, done chan bool) {
 }
 
 func checkQueue(queueName string, ch *amqp.Channel) (int, error) {
+	log.Printf("Checking queue: %s", queueName)
 	queue, err := ch.QueueInspect(queueName)
 	if err != nil {
 		return 0, fmt.Errorf("failed to inspect queue: %v", err)
@@ -142,6 +144,8 @@ func updateEmptyQWeightRoutine() {
 }
 
 func main() {
+	log.Println("Application starting")
+
 	// Find the queue name with the specified prefix
 	queueName, err := findQueueWithPrefix("rabbitmq-setup.event-trigger.")
 	if err != nil {
@@ -177,10 +181,12 @@ func main() {
 	// Signal the polling goroutine to stop
 	done <- true
 	close(done)
+	log.Println("Application stopped")
 }
 
 // Function to set up a persistent RabbitMQ connection and channel
 func setupRabbitMQ() (*amqp.Connection, *amqp.Channel, error) {
+	log.Println("Setting up RabbitMQ connection")
 	conn, err := amqp.Dial(rabbitMQURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to RabbitMQ: %v", err)
@@ -192,6 +198,7 @@ func setupRabbitMQ() (*amqp.Connection, *amqp.Channel, error) {
 		return nil, nil, fmt.Errorf("failed to open a channel: %v", err)
 	}
 
+	log.Println("RabbitMQ connection and channel set up successfully")
 	return conn, ch, nil
 }
 
