@@ -20,11 +20,13 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// Define CloudEventData struct to represent event data
 type CloudEventData struct {
 	ImageData string `json:"imageData"`
 	Message   string `json:"message,omitempty"`
 }
 
+// Define Service struct to represent service details
 type Service struct {
 	Name         string
 	CurrWeight   int
@@ -33,30 +35,42 @@ type Service struct {
 	Alpha        int
 }
 
+// Define Queue struct to represent RabbitMQ queue details
 type Queue struct {
 	Name     string `json:"name"`
 	Messages int    `json:"messages"`
 }
 
 var (
-	admissionRatesMutex   sync.Mutex
-	servicesMap           map[string]*Service
-	serviceNames          []string
-	lastUpdateTime        time.Time
-	redisURL              string
-	redisPass             string
-	ctx                   = context.Background()
+	// Mutex to handle concurrent access to admission rates
+	admissionRatesMutex sync.Mutex
+	// Map to store service details
+	servicesMap map[string]*Service
+	// List of service names
+	serviceNames []string
+	// Timestamp of the last update
+	lastUpdateTime time.Time
+	// Redis connection parameters
+	redisURL  string
+	redisPass string
+	// Context for Redis operations
+	ctx = context.Background()
+	// Interval for updating admission rates
 	admissionRateInterval time.Duration
-	serviceKeyPrefix      = "service:"
-	tkKey                 = "tk"
-	emptyQueue            = false
-	prevQueueEmpty        = false // Flag to check if the queue was empty in the previous check
+	// Redis key prefixes
+	serviceKeyPrefix = "service:"
+	tkKey            = "tk"
+	// Flags to handle queue state
+	emptyQueue     = false
+	prevQueueEmpty = false // Flag to check if the queue was empty in the previous check
 
+	// RabbitMQ connection parameters
 	rabbitMQURL     string
 	rabbitMQURLhttp string
 	rabbitMQUser    string
 	rabbitMQPass    string
-	checkInterval   time.Duration
+	// Interval for checking queue state
+	checkInterval time.Duration
 )
 
 // Initialize environment variables and configurations
@@ -111,6 +125,7 @@ func init() {
 	}
 }
 
+// Function to get check interval from environment variable
 func getCheckIntervalFromEnv(envVar string, defaultValue int) time.Duration {
 	intervalStr := os.Getenv(envVar)
 	if intervalStr == "" {
@@ -123,6 +138,8 @@ func getCheckIntervalFromEnv(envVar string, defaultValue int) time.Duration {
 	}
 	return time.Duration(interval)
 }
+
+// Redis-related functions
 
 // Function to create a new Redis client
 func newRedisClient() *redis.Client {
@@ -228,7 +245,7 @@ func updateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 }
 
 // Send event to one of the services based on admission rates
-func sendToEventDisplays(rdb *redis.Client, event cloudevents.Event) {
+func sendToEventDisplays(event cloudevents.Event) {
 	admissionRatesMutex.Lock()
 	defer admissionRatesMutex.Unlock()
 
@@ -311,14 +328,16 @@ func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 	}
 }
 
+// CloudEvent-related functions
+
 // Receive and process incoming CloudEvents
-func receive(rdb *redis.Client, event cloudevents.Event, currentTime time.Time) {
-	sendToEventDisplays(rdb, event)
+func receive(event cloudevents.Event) {
+	sendToEventDisplays(event)
 	prevQueueEmpty = false // Reset flag as the queue is no longer empty
 }
 
 // Start the CloudEvent receiver and monitor the queue
-func startReceiver(rdb *redis.Client) {
+func startReceiver() {
 	rand.Seed(time.Now().UnixNano())
 	c, err := cloudevents.NewClientHTTP()
 	if err != nil {
@@ -326,8 +345,7 @@ func startReceiver(rdb *redis.Client) {
 	}
 
 	err = c.StartReceiver(context.Background(), func(ctx context.Context, event cloudevents.Event) {
-		currentTime := time.Now()
-		receive(rdb, event, currentTime)
+		receive(event)
 	})
 	if err != nil {
 		log.Fatalf("❌ Failed to start receiver: %v", err)
@@ -347,6 +365,8 @@ func startAdmissionRateUpdater(rdb *redis.Client) {
 	}
 }
 
+// RabbitMQ-related functions
+
 // Function to set up a persistent RabbitMQ connection and channel
 func setupRabbitMQ() (*amqp.Connection, *amqp.Channel, error) {
 	log.Println("🔌 Setting up RabbitMQ connection")
@@ -365,9 +385,10 @@ func setupRabbitMQ() (*amqp.Connection, *amqp.Channel, error) {
 	return conn, ch, nil
 }
 
+// Function to find the queue with the specified prefix
 func findQueueWithPrefix(prefix string) (string, error) {
 	request := gorequest.New()
-	apiURL := fmt.Sprintf("http://rabbitmq.rabbitmq-setup.svc.cluster.local:15672/api/queues")
+	apiURL := `http://rabbitmq.rabbitmq-setup.svc.cluster.local:15672/api/queues`
 	resp, body, errs := request.Get(apiURL).
 		SetBasicAuth(rabbitMQUser, rabbitMQPass).
 		End()
@@ -395,6 +416,7 @@ func findQueueWithPrefix(prefix string) (string, error) {
 	return "", nil // Queue with the specified prefix not found
 }
 
+// Function to poll the specified queue for messages
 func pollQueue(queueName string, ch *amqp.Channel, done chan bool) {
 	log.Printf("📡 Starting to poll queue %s", queueName)
 	for {
@@ -421,6 +443,7 @@ func pollQueue(queueName string, ch *amqp.Channel, done chan bool) {
 	}
 }
 
+// Function to check the number of messages in a RabbitMQ queue
 func checkQueue(queueName string, ch *amqp.Channel) (int, error) {
 	log.Printf("🔍 Checking queue: %s", queueName)
 	queue, err := ch.QueueInspect(queueName)
@@ -430,6 +453,7 @@ func checkQueue(queueName string, ch *amqp.Channel) (int, error) {
 	return queue.Messages, nil
 }
 
+// Function to update EmptyQWeight when queue is empty
 func updateEmptyQWeightRoutine() {
 	log.Println("🛠️ Starting updateEmptyQWeightRoutine")
 	rdb := newRedisClient()
@@ -437,6 +461,7 @@ func updateEmptyQWeightRoutine() {
 	createEmptyQueueEvent(rdb, currentTime)
 }
 
+// Main function to start the application
 func main() {
 	rdb := newRedisClient()
 
@@ -448,7 +473,7 @@ func main() {
 	fmt.Println("✅ Value of 'tk' initialized in Redis")
 
 	initializeServices(rdb)
-	go startReceiver(rdb)
+	go startReceiver()
 	go startAdmissionRateUpdater(rdb)
 
 	// Find the queue name with the specified prefix
