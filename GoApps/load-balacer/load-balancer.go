@@ -2,16 +2,22 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
 	"os"
+	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/go-redis/redis/v8"
+	"github.com/parnurzeal/gorequest"
+	"github.com/streadway/amqp"
 )
 
 type CloudEventData struct {
@@ -27,23 +33,30 @@ type Service struct {
 	Alpha        int
 }
 
+type Queue struct {
+	Name     string `json:"name"`
+	Messages int    `json:"messages"`
+}
+
 var (
 	admissionRatesMutex   sync.Mutex
 	servicesMap           map[string]*Service
-	emptyQueueEventSent   bool
-	messageCounter        int
-	messageRateThreshold  int = 1
 	serviceNames          []string
 	lastUpdateTime        time.Time
 	redisURL              string
 	redisPass             string
 	ctx                   = context.Background()
-	idleTimeoutDuration   = 5 * time.Second // Idle timeout duration variable
-	admissionRateInterval = 5 * time.Second // Interval for updating admission rates
+	admissionRateInterval time.Duration
 	serviceKeyPrefix      = "service:"
 	tkKey                 = "tk"
 	emptyQueue            = false
 	prevQueueEmpty        = false // Flag to check if the queue was empty in the previous check
+
+	rabbitMQURL     string
+	rabbitMQURLhttp string
+	rabbitMQUser    string
+	rabbitMQPass    string
+	checkInterval   time.Duration
 )
 
 // Initialize environment variables and configurations
@@ -56,6 +69,29 @@ func init() {
 	if redisPass == "" {
 		log.Fatal("❌ REDIS_PASSWORD environment variable is not set")
 	}
+
+	rabbitMQURLhttp = os.Getenv("RABBITMQ_URL")
+	if rabbitMQURLhttp == "" {
+		log.Fatal("❌ RABBITMQ_URL environment variable is not set")
+	}
+	rabbitMQUser = os.Getenv("RABBITMQ_USERNAME")
+	if rabbitMQUser == "" {
+		log.Fatal("❌ RABBITMQ_USERNAME environment variable is not set")
+	}
+	rabbitMQPass = os.Getenv("RABBITMQ_PASSWORD")
+	if rabbitMQPass == "" {
+		log.Fatal("❌ RABBITMQ_PASSWORD environment variable is not set")
+	}
+
+	// Construct RabbitMQ URL with username and password
+	rabbitMQURL = fmt.Sprintf("amqp://%s:%s@rabbitmq.rabbitmq-setup.svc.cluster.local:5672/",
+		rabbitMQUser, rabbitMQPass)
+	log.Printf("🔗 Constructed RabbitMQ URL: %s", rabbitMQURL)
+
+	// Set checkInterval from environment variable or use default
+	checkInterval = getCheckIntervalFromEnv("CHECK_INTERVAL", 500) * time.Millisecond
+	admissionRateInterval = checkInterval
+	log.Printf("⏱️ Check interval and admission rate interval set to: %s", checkInterval)
 
 	// Read the number of services from the environment variable
 	numServicesStr := os.Getenv("NUM_SERVICES")
@@ -73,6 +109,19 @@ func init() {
 	for i := 0; i < numServices; i++ {
 		serviceNames[i] = fmt.Sprintf("service%d", i+1)
 	}
+}
+
+func getCheckIntervalFromEnv(envVar string, defaultValue int) time.Duration {
+	intervalStr := os.Getenv(envVar)
+	if intervalStr == "" {
+		return time.Duration(defaultValue)
+	}
+	interval, err := strconv.Atoi(intervalStr)
+	if err != nil || interval <= 0 {
+		log.Printf("⚠️ Invalid value for %s: %s. Using default: %dms", envVar, intervalStr, defaultValue)
+		return time.Duration(defaultValue)
+	}
+	return time.Duration(interval)
 }
 
 // Function to create a new Redis client
@@ -145,18 +194,31 @@ func updateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 	admissionRatesMutex.Lock()
 	defer admissionRatesMutex.Unlock()
 
-	// Additive Increase (AI) phase
-	elapsedTime := time.Since(lastUpdateTime).Seconds()
-	if elapsedTime >= 1.0 {
+	// Check if the queue was empty in the last check
+	if prevQueueEmpty {
+		// Multiplicative Decrease (MD) phase
 		for _, service := range servicesMap {
-			// Increase the current weight by Beta * EmptyQWeight + Alpha * elapsedTime
-			service.CurrWeight = int(float64(service.Beta)*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)
+			service.CurrWeight = int(float64(service.Beta) * float64(service.EmptyQWeight))
 			err := rdb.HSet(ctx, serviceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
 			if err != nil {
 				log.Printf("❌ Error updating curr_weight for service %s in Redis: %v", service.Name, err)
 			}
 		}
-		lastUpdateTime = currentTime
+		prevQueueEmpty = false // Reset the flag after applying MD
+	} else {
+		// Additive Increase (AI) phase
+		elapsedTime := time.Since(lastUpdateTime).Seconds()
+		if elapsedTime >= 0.5 { // Ensure updates are frequent
+			for _, service := range servicesMap {
+				// Increase the current weight by Alpha * elapsedTime
+				service.CurrWeight += service.Alpha * int(elapsedTime)
+				err := rdb.HSet(ctx, serviceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
+				if err != nil {
+					log.Printf("❌ Error updating curr_weight for service %s in Redis: %v", service.Name, err)
+				}
+			}
+			lastUpdateTime = currentTime
+		}
 	}
 
 	// Log updated admission rates
@@ -263,28 +325,9 @@ func startReceiver(rdb *redis.Client) {
 		log.Fatalf("❌ Failed to create client: %v", err)
 	}
 
-	idleTimer := time.NewTimer(idleTimeoutDuration)
-
-	go func() {
-		for {
-			select {
-			case <-idleTimer.C:
-				// Check if there are no messages and trigger empty queue event
-				createEmptyQueueEvent(rdb, time.Now())
-				idleTimer.Reset(idleTimeoutDuration)
-			}
-		}
-	}()
-
 	err = c.StartReceiver(context.Background(), func(ctx context.Context, event cloudevents.Event) {
 		currentTime := time.Now()
 		receive(rdb, event, currentTime)
-
-		// Reset idle timer
-		if !idleTimer.Stop() {
-			<-idleTimer.C
-		}
-		idleTimer.Reset(idleTimeoutDuration)
 	})
 	if err != nil {
 		log.Fatalf("❌ Failed to start receiver: %v", err)
@@ -304,6 +347,96 @@ func startAdmissionRateUpdater(rdb *redis.Client) {
 	}
 }
 
+// Function to set up a persistent RabbitMQ connection and channel
+func setupRabbitMQ() (*amqp.Connection, *amqp.Channel, error) {
+	log.Println("🔌 Setting up RabbitMQ connection")
+	conn, err := amqp.Dial(rabbitMQURL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("❌ failed to connect to RabbitMQ: %v", err)
+	}
+
+	ch, err := conn.Channel()
+	if err != nil {
+		conn.Close()
+		return nil, nil, fmt.Errorf("❌ failed to open a channel: %v", err)
+	}
+
+	log.Println("✅ RabbitMQ connection and channel set up successfully")
+	return conn, ch, nil
+}
+
+func findQueueWithPrefix(prefix string) (string, error) {
+	request := gorequest.New()
+	apiURL := fmt.Sprintf("http://rabbitmq.rabbitmq-setup.svc.cluster.local:15672/api/queues")
+	resp, body, errs := request.Get(apiURL).
+		SetBasicAuth(rabbitMQUser, rabbitMQPass).
+		End()
+
+	if len(errs) > 0 {
+		return "", fmt.Errorf("❌ Failed to get queues: %v", errs)
+	}
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("❌ Unexpected status code: %d", resp.StatusCode)
+	}
+
+	var queues []Queue
+	err := json.Unmarshal([]byte(body), &queues)
+	if err != nil {
+		return "", fmt.Errorf("❌ Failed to parse response: %v", err)
+	}
+
+	for _, queue := range queues {
+		if strings.HasPrefix(queue.Name, prefix) {
+			return queue.Name, nil
+		}
+	}
+
+	return "", nil // Queue with the specified prefix not found
+}
+
+func pollQueue(queueName string, ch *amqp.Channel, done chan bool) {
+	log.Printf("📡 Starting to poll queue %s", queueName)
+	for {
+		select {
+		case <-done:
+			log.Println("🛑 Stopping pollQueue goroutine")
+			return
+		default:
+			messageCount, err := checkQueue(queueName, ch)
+			if err != nil {
+				log.Printf("❌ Error checking queue: %v\n", err)
+			} else {
+				log.Printf("📋 Queue %s has %d messages\n", queueName, messageCount)
+				if messageCount == 0 && !prevQueueEmpty {
+					log.Printf("📭 Queue %s is now empty\n", queueName)
+					prevQueueEmpty = true
+					updateEmptyQWeightRoutine()
+				} else if messageCount > 0 {
+					prevQueueEmpty = false
+				}
+			}
+			time.Sleep(checkInterval)
+		}
+	}
+}
+
+func checkQueue(queueName string, ch *amqp.Channel) (int, error) {
+	log.Printf("🔍 Checking queue: %s", queueName)
+	queue, err := ch.QueueInspect(queueName)
+	if err != nil {
+		return 0, fmt.Errorf("❌ failed to inspect queue: %v", err)
+	}
+	return queue.Messages, nil
+}
+
+func updateEmptyQWeightRoutine() {
+	log.Println("🛠️ Starting updateEmptyQWeightRoutine")
+	rdb := newRedisClient()
+	currentTime := time.Now()
+	createEmptyQueueEvent(rdb, currentTime)
+}
+
 func main() {
 	rdb := newRedisClient()
 
@@ -317,6 +450,43 @@ func main() {
 	initializeServices(rdb)
 	go startReceiver(rdb)
 	go startAdmissionRateUpdater(rdb)
+
+	// Find the queue name with the specified prefix
+	queueName, err := findQueueWithPrefix("rabbitmq-setup.event-trigger.")
+	if err != nil {
+		log.Fatalf("❌ Error finding queue: %v", err)
+	}
+	if queueName == "" {
+		log.Fatalf("❌ Queue with prefix 'rabbitmq-setup.event-trigger.' not found")
+	}
+	log.Printf("🔍 Found queue with name: %s", queueName)
+
+	// Set up RabbitMQ connection and channel
+	conn, ch, err := setupRabbitMQ()
+	if err != nil {
+		log.Fatalf("❌ Failed to setup RabbitMQ: %v", err)
+	}
+	defer conn.Close()
+	defer ch.Close()
+
+	// Create a channel to signal termination
+	done := make(chan bool)
+
+	// Start the AMQP channel to continuously poll the queue
+	go func() {
+		pollQueue(queueName, ch, done)
+	}()
+
+	// Handle graceful shutdown
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	<-signalChan
+	log.Println("📴 Received termination signal, shutting down gracefully...")
+
+	// Signal the polling goroutine to stop
+	done <- true
+	close(done)
+	log.Println("🛑 Application stopped")
 
 	// Block indefinitely to keep the program running
 	select {}
