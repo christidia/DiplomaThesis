@@ -333,7 +333,6 @@ func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 // Receive and process incoming CloudEvents
 func receive(event cloudevents.Event) {
 	sendToEventDisplays(event)
-	prevQueueEmpty = false // Reset flag as the queue is no longer empty
 }
 
 // Start the CloudEvent receiver and monitor the queue
