@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: event-trigger-dispatcher-monitor
+  namespace: rabbitmq-setup
+spec:
+  selector:
+    matchLabels:
+  namespaceSelector:
+    matchNames:
+      - rabbitmq-setup
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

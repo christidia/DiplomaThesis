@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: broker-ingress
+  name: broker-ingress
+  namespace: knative-eventing
+spec:
+  endpoints:
+  - honorLabels: true
+    interval: 30s
+    path: /metrics
+    port: http-metrics
+  namespaceSelector:
+    matchNames:
+    - rabbitmq-setup # Update to the target namespace
+  selector:
+    matchLabels:
+      eventing.knative.dev/brokerRole: ingress
