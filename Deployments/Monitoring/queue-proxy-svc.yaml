@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: knative-metrics-9091
+  namespace: rabbitmq-setup
+  labels:
+    app: knative-metrics-9091
+spec:
+  selector:
+    app: event-display
+    #   version: v1  # Add additional label to make the selector more specific
+  ports:
+    - name: metrics-9091
+      protocol: TCP
+      port: 9091
+      targetPort: 9091

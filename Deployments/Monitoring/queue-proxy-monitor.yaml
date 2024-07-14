@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: knative-service-metrics
+  namespace: rabbitmq-setup
+spec:
+  namespaceSelector:
+    matchNames:
+      - rabbitmq-setup
+  selector:
+    matchLabels:
+      app: knative-metrics-9091
+  endpoints:
+    - port: metrics-9091  # Name of the port in the service definition
