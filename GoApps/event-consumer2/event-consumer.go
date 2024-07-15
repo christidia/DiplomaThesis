@@ -13,7 +13,6 @@ import (
 	"os"
 	"strconv"
 	"sync"
-	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/wimspaargaren/yolov3"
@@ -115,17 +114,22 @@ func startProcessor(workerID int, wg *sync.WaitGroup) {
 	}
 }
 
+// func display(event cloudevents.Event) {
+// 	for {
+// 		select {
+// 		case requestQueue <- event:
+// 			log.Println("📥 Event queued for processing")
+// 			return
+// 		default:
+// 			log.Println("⚠️ Request queue is full, waiting for space...")
+// 			time.Sleep(time.Millisecond * 100) // Sleep for a short duration before retrying
+// 		}
+// 	}
+// }
+
 func display(event cloudevents.Event) {
-	for {
-		select {
-		case requestQueue <- event:
-			log.Println("📥 Event queued for processing")
-			return
-		default:
-			log.Println("⚠️ Request queue is full, waiting for space...")
-			time.Sleep(time.Millisecond * 100) // Sleep for a short duration before retrying
-		}
-	}
+	requestQueue <- event
+	log.Println("📥 Event queued for processing")
 }
 
 func main() {
