@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/wimspaargaren/yolov3"
@@ -23,9 +24,8 @@ var (
 	yolov3ConfigPath  = "/go/src/app/yolov3-tiny.cfg"
 	yolov3WeightsPath = "/go/src/app/yolov3-tiny.weights"
 	cocoNamesPath     = "/go/src/app/coco.names"
-	yolonetInitOnce   sync.Once
-	yolonet           yolov3.Net
 	requestQueue      chan cloudevents.Event
+	numWorkers        int
 )
 
 type CloudEventData struct {
@@ -39,20 +39,19 @@ func init() {
 		queueSize = 100 // default queue size
 	}
 	requestQueue = make(chan cloudevents.Event, queueSize)
-}
 
-func initYoloNet() {
-	var err error
-	yolonet, err = yolov3.NewNet(yolov3WeightsPath, yolov3ConfigPath, cocoNamesPath)
-	if err != nil {
-		log.Fatalf("❌ Unable to create YOLO net: %v", err)
+	numWorkersStr := os.Getenv("NUM_WORKERS")
+	numWorkers, err = strconv.Atoi(numWorkersStr)
+	if err != nil || numWorkers < 1 {
+		numWorkers = 4 // default number of workers
 	}
 }
 
-func processImage(event cloudevents.Event) {
-	// Ensure YOLOv3 net is initialized only once
-	yolonetInitOnce.Do(initYoloNet)
+func createYoloNet() (yolov3.Net, error) {
+	return yolov3.NewNet(yolov3WeightsPath, yolov3ConfigPath, cocoNamesPath)
+}
 
+func processImage(event cloudevents.Event, yolonet yolov3.Net) {
 	// Parse the CloudEvent payload
 	var eventData CloudEventData
 	if err := event.DataAs(&eventData); err != nil {
@@ -102,24 +101,31 @@ func processImage(event cloudevents.Event) {
 	fmt.Println("------")
 }
 
-func startProcessor() {
+func startProcessor(workerID int, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	// Initialize YOLO net for this worker
+	yolonet, err := createYoloNet()
+	if err != nil {
+		log.Fatalf("❌ Worker %d: Unable to create YOLO net: %v", workerID, err)
+	}
+
 	for event := range requestQueue {
-		processImage(event)
+		processImage(event, yolonet)
 	}
 }
 
-// func display(event cloudevents.Event) {
-//     select {
-//     case requestQueue <- event:
-//         log.Println("📥 Event queued for processing")
-//     default:
-//         log.Println("⚠️ Request queue is full, discarding event")
-//     }
-// }
-
 func display(event cloudevents.Event) {
-	requestQueue <- event
-	log.Println("📥 Event queued for processing")
+	for {
+		select {
+		case requestQueue <- event:
+			log.Println("📥 Event queued for processing")
+			return
+		default:
+			log.Println("⚠️ Request queue is full, waiting for space...")
+			time.Sleep(time.Millisecond * 100) // Sleep for a short duration before retrying
+		}
+	}
 }
 
 func main() {
@@ -142,13 +148,20 @@ func run(ctx context.Context) {
 		log.Fatalf("❌ Failed to create client: %v", err)
 	}
 
-	// Start the processor goroutine
-	go startProcessor()
+	// Start the processor goroutines
+	var wg sync.WaitGroup
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go startProcessor(i, &wg)
+	}
 
 	// Start the receiver
 	if err := c.StartReceiver(ctx, display); err != nil {
 		log.Fatalf("❌ Error during receiver's runtime: %v", err)
 	}
+
+	// Wait for all workers to finish
+	wg.Wait()
 }
 
 // HTTP path of the health endpoint used for probing the service.
