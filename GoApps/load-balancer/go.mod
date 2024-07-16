@@ -7,6 +7,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/parnurzeal/gorequest v0.3.0
 	github.com/streadway/amqp v1.1.0
+	golang.org/x/exp v0.0.0-20240716175740-e3f259677ff7
 )
 
 require (
