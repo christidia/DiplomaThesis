@@ -2,12 +2,14 @@ package events
 
 import (
 	"context"
-	"load-balancer/routing"
 	"log"
-	"math/rand"
 	"time"
 
+	rdb "load-balancer/redis"
+	"load-balancer/routing"
+
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"golang.org/x/exp/rand"
 )
 
 func StartReceiver() {
@@ -26,5 +28,5 @@ func StartReceiver() {
 }
 
 func Receive(event cloudevents.Event) {
-	routing.SelectedAlgorithm.RouteEvent(event, redis.ServicesMap)
+	routing.SelectedAlgorithm.RouteEvent(event, rdb.ServicesMap)
 }

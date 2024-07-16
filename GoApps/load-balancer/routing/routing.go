@@ -3,15 +3,16 @@ package routing
 import (
 	"context"
 	"fmt"
-	"load/config"
 	"log"
 	"math/rand"
 	"sync"
 	"time"
 
-	"load-balancer/redis"
+	"load-balancer/config"
+	rdb "load-balancer/redis" // Alias the custom redis package
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	redis "github.com/go-redis/redis/v8" // Alias the Go Redis package
 )
 
 var (
@@ -19,12 +20,12 @@ var (
 )
 
 type RoutingAlgorithm interface {
-	RouteEvent(event cloudevents.Event, servicesMap map[string]*redis.Service)
+	RouteEvent(event cloudevents.Event, servicesMap map[string]*rdb.Service)
 }
 
 type AIMDRoutingAlgorithm struct{}
 
-func (a *AIMDRoutingAlgorithm) RouteEvent(event cloudevents.Event, servicesMap map[string]*redis.Service) {
+func (a *AIMDRoutingAlgorithm) RouteEvent(event cloudevents.Event, servicesMap map[string]*rdb.Service) {
 	totalRate := 0
 	for _, service := range servicesMap {
 		totalRate += service.CurrWeight
@@ -33,7 +34,7 @@ func (a *AIMDRoutingAlgorithm) RouteEvent(event cloudevents.Event, servicesMap m
 	randomValue := rand.Intn(totalRate)
 
 	cumulativeRate := 0
-	var destination *redis.Service
+	var destination *rdb.Service
 	for _, service := range servicesMap {
 		cumulativeRate += service.CurrWeight
 		if randomValue < cumulativeRate {
@@ -73,7 +74,7 @@ type RoundRobinRoutingAlgorithm struct {
 	mu      sync.Mutex
 }
 
-func (r *RoundRobinRoutingAlgorithm) RouteEvent(event cloudevents.Event, servicesMap map[string]*redis.Service) {
+func (r *RoundRobinRoutingAlgorithm) RouteEvent(event cloudevents.Event, servicesMap map[string]*rdb.Service) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -108,14 +109,14 @@ func (r *RoundRobinRoutingAlgorithm) RouteEvent(event cloudevents.Event, service
 	log.Printf("✅ Successfully sent event to %s", destination.Name)
 }
 
-func StartAdmissionRateUpdater(rdb *redis.Client) {
+func StartAdmissionRateUpdater(rdbClient *redis.Client) {
 	ticker := time.NewTicker(config.AdmissionRateInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case currentTime := <-ticker.C:
-			redis.UpdateAdmissionRates(rdb, currentTime)
+			rdb.UpdateAdmissionRates(rdbClient, currentTime)
 		}
 	}
 }
