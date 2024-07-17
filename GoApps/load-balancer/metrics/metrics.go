@@ -26,9 +26,9 @@ func StartMetricsServer() {
 	prometheus.DefaultRegisterer = CustomRegistry
 	prometheus.DefaultGatherer = CustomRegistry
 
-	CustomRegistry.MustRegister(EmptyQWeight)
+	prometheus.MustRegister(EmptyQWeight)
 
 	log.Println("🚀Starting metrics server on :2112")
-	http.Handle("/metrics", promhttp.HandlerFor(CustomRegistry, promhttp.HandlerOpts{EnableOpenMetrics: false}))
+	http.Handle("/metrics", promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{EnableOpenMetrics: false}))
 	log.Fatal(http.ListenAndServe(":2112", nil))
 }
