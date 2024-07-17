@@ -3,17 +3,20 @@ package events
 import (
 	"context"
 	"log"
+	"math/rand"
 	"time"
 
 	rdb "load-balancer/redis"
 	"load-balancer/routing"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
-	"golang.org/x/exp/rand"
+)
+
+var (
+	localRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
 func StartReceiver() {
-	rand.Seed(time.Now().UnixNano())
 	c, err := cloudevents.NewClientHTTP()
 	if err != nil {
 		log.Fatalf("❌ Failed to create client: %v", err)

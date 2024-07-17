@@ -9,14 +9,15 @@ import (
 	"time"
 
 	"load-balancer/config"
-	rdb "load-balancer/redis" // Alias the custom redis package
+	rdb "load-balancer/redis"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
-	redis "github.com/go-redis/redis/v8" // Alias the Go Redis package
+	redis "github.com/go-redis/redis/v8"
 )
 
 var (
 	SelectedAlgorithm RoutingAlgorithm
+	localRand         = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
 type RoutingAlgorithm interface {
@@ -31,7 +32,7 @@ func (a *AIMDRoutingAlgorithm) RouteEvent(event cloudevents.Event, servicesMap m
 		totalRate += service.CurrWeight
 	}
 
-	randomValue := rand.Intn(totalRate)
+	randomValue := localRand.Intn(totalRate)
 
 	cumulativeRate := 0
 	var destination *rdb.Service
@@ -113,10 +114,7 @@ func StartAdmissionRateUpdater(rdbClient *redis.Client) {
 	ticker := time.NewTicker(config.AdmissionRateInterval)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case currentTime := <-ticker.C:
-			rdb.UpdateAdmissionRates(rdbClient, currentTime)
-		}
+	for currentTime := range ticker.C {
+		rdb.UpdateAdmissionRates(rdbClient, currentTime)
 	}
 }
