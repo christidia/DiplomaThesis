@@ -4,6 +4,8 @@ import (
 	"log"
 	"os"
 	"strconv"
+
+	cloudevents "github.com/cloudevents/sdk-go/v2"
 )
 
 var (
