@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"load-balancer/config"
 	"load-balancer/events"
@@ -12,14 +13,9 @@ import (
 	"load-balancer/rabbitmq"
 	"load-balancer/redis"
 	"load-balancer/routing"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 func main() {
-	// Set the default registry to the custom registry
-	prometheus.DefaultRegisterer = metrics.CustomRegistry
-	prometheus.DefaultGatherer = metrics.CustomRegistry
 
 	// Load configurations
 	config.LoadConfig()
@@ -58,13 +54,17 @@ func main() {
 		rabbitmq.PollQueue(queueName, ch, done)
 	}()
 
-	// Start HTTP server for Prometheus metrics
-	go func() {
-		metrics.StartMetricsServer()
-	}()
+	// Initialize and start the metrics server
+	metrics.InitMetrics()
+	go metrics.StartMetricsServer()
 
-	// Start the metrics update goroutine
-	go metrics.UpdateMetrics()
+	// Example of updating the metric in a separate goroutine
+	go func() {
+		for {
+			metrics.UpdateMetric("service1", float64(time.Now().Unix()%100))
+			time.Sleep(10 * time.Second)
+		}
+	}()
 
 	// Handle graceful shutdown
 	signalChan := make(chan os.Signal, 1)
