@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"load-balancer/config"
-	"load-balancer/metrics"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -53,8 +52,8 @@ func InitializeServices(rdb *redis.Client) {
 		if err := saveServiceToRedis(rdb, service); err != nil {
 			log.Fatalf("❌ Error saving service %s to Redis: %v", service.Name, err)
 		}
-		// Set initial metric values
-		metrics.EmptyQWeight.WithLabelValues(service.Name).Set(float64(service.EmptyQWeight))
+		// // Set initial metric values
+		// metrics.EmptyQWeight.WithLabelValues(service.Name).Set(float64(service.EmptyQWeight))
 	}
 	LastUpdateTime = time.Now()
 	log.Println("✅ Services initialized")
@@ -125,7 +124,7 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 	for _, service := range ServicesMap {
 		log.Printf("📈 Updated admission rate for %s: %d", service.Name, service.CurrWeight)
 		// expose metrics
-		metrics.EmptyQWeight.WithLabelValues(service.Name).Set(float64(service.EmptyQWeight))
+		// metrics.EmptyQWeight.WithLabelValues(service.Name).Set(float64(service.EmptyQWeight))
 	}
 }
 
@@ -154,7 +153,7 @@ func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 			}
 
 			// Update the Prometheus metric
-			metrics.EmptyQWeight.WithLabelValues(service.Name).Set(float64(service.EmptyQWeight))
+			// metrics.EmptyQWeight.WithLabelValues(service.Name).Set(float64(service.EmptyQWeight))
 		}
 
 		log.Printf("⚖️ Updated EmptyQWeight for all services: %v\n", ServicesMap)

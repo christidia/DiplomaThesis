@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -13,13 +12,14 @@ import (
 	"load-balancer/rabbitmq"
 	"load-balancer/redis"
 	"load-balancer/routing"
-)
 
-var (
-	ctx = context.Background()
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func main() {
+	// Set the default registry to the custom registry
+	prometheus.DefaultRegisterer = metrics.CustomRegistry
+	prometheus.DefaultGatherer = metrics.CustomRegistry
 
 	// Load configurations
 	config.LoadConfig()
@@ -62,6 +62,9 @@ func main() {
 	go func() {
 		metrics.StartMetricsServer()
 	}()
+
+	// Start the metrics update goroutine
+	go metrics.UpdateMetrics()
 
 	// Handle graceful shutdown
 	signalChan := make(chan os.Signal, 1)
