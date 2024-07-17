@@ -1,24 +1,21 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 
+	"consumer/config"
+	"consumer/logging"
+
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/wimspaargaren/yolov3"
 	"gocv.io/x/gocv"
-	"co/config"
-	"your_project/logging"
-	"your_project/processor"
 )
 
 var (
@@ -167,3 +164,4 @@ func requestLoggingMiddleware(enabled bool) func(next http.Handler) http.Handler
 		})
 	}
 }
+
