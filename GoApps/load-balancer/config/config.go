@@ -65,6 +65,7 @@ func LoadConfig() {
 
 	RoutingAlgorithm = os.Getenv("ROUTING_ALGORITHM")
 	if RoutingAlgorithm == "" {
-		log.Fatal("❌ ROUTING_ALGORITHM environment variable is not set")
+		log.Println("⚠️ ROUTING_ALGORITHM environment variable is not set. Using default: AIMD")
+		RoutingAlgorithm = "AIMD"
 	}
 }
