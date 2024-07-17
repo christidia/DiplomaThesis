@@ -22,16 +22,14 @@ spec:
     spec:
       containerConcurrency: 1
       containers:
-        - image: christinedia/event-consumer:display2 #opencv4   #third
+        - image: christinedia/event-consumer:display #opencv4   #third
           env:
             - name: QUEUE_SIZE
-              value: "4"
-            - name: NUM_WORKERS
-              value: "2" 
+              value: "2"
           resources:
             limits:
-              cpu: "2000m"       # 4 CPU cores
-              memory: "4096Mi"    # 2.2 GiB
+              cpu: "1000m"       # 4 CPU cores
+              memory: "2048Mi"    # 2.2 GiB
             requests:
               cpu: "1000m"        # 2 CPU cores
               memory: "2048Mi"    # 1.7 GiB

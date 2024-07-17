@@ -20,7 +20,7 @@ spec:
       #   autoscaling.knative.dev/panic-threshold-percentage: "200"  # More aggressive scaling
     spec:
       containers:
-        - image: christinedia/event-consumer:opencv4   #third
+        - image: christinedia/event-consumer:display   #third
           env:
             - name: QUEUE_SIZE
               value: "1"

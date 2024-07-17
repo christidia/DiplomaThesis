@@ -9,18 +9,19 @@ spec:
       labels:
         app: event-display
         version: v2
-      # annotations:
+      annotations:
       #   autoscaling.knative.dev/minScale: "1"
-      #   autoscaling.knative.dev/maxScale: "10"
-      #   autoscaling.knative.dev/metric: "rps"
-      #   autoscaling.knative.dev/target: "10"
+          autoscaling.knative.dev/maxScale: "3"
+          autoscaling.knative.dev/metric: "concurrency"
+          autoscaling.knative.dev/target: "1"
       #   autoscaling.knative.dev/scale-to-zero: "true"
       #   autoscaling.knative.dev/scale-up-rate: "10.0"
       #   autoscaling.knative.dev/panic-window: "10s"
       #   autoscaling.knative.dev/panic-threshold-percentage: "200"  # More aggressive scaling
     spec:
+      containerConcurrency: 2
       containers:
-        - image: christinedia/event-consumer:opencv4   #third
+        - image: christinedia/event-consumer:display #opencv4   #third
           env:
             - name: QUEUE_SIZE
               value: "1"

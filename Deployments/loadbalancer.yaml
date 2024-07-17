@@ -8,9 +8,12 @@ spec:
     metadata:
       labels:
         app: mservice
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"
     spec:
       containers:
-        - image: christinedia/routing:svcs    #new
+        - image: christinedia/routing:controller2 #controller    
           env:
             - name: REDIS_URL
               value: "my-redis-master.rabbitmq-setup.svc.cluster.local:6379"
@@ -21,3 +24,23 @@ spec:
                   key: redis-password
             - name: NUM_SERVICES
               value: "3"
+            - name: RABBITMQ_URL
+              value: "http://rabbitmq.rabbitmq-setup.svc.cluster.local:15672/api/queues"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: username
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-default-user
+                  key: password
+            - name: CHECK_INTERVAL
+              value: "1000"
+          readinessProbe:
+            successThreshold: 1
+            tcpSocket:
+              port: 8080
+          ports:
+            - containerPort: 8080
