@@ -13,6 +13,8 @@ import (
 	"load-balancer/rabbitmq"
 	"load-balancer/redis"
 	"load-balancer/routing"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -20,6 +22,10 @@ var (
 )
 
 func main() {
+	// Set the default registry to the custom registry
+	prometheus.DefaultRegisterer = metrics.customRegistry
+	prometheus.DefaultGatherer = metrics.customRegistry
+
 	// Load configurations
 	config.LoadConfig()
 

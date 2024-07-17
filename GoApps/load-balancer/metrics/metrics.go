@@ -1,16 +1,17 @@
 package metrics
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-var (
-	// Define a custom Prometheus registry
-	customRegistry = prometheus.NewRegistry()
+// Define a custom Prometheus registry
+var customRegistry = prometheus.NewRegistry()
 
+var (
 	// Define the Prometheus gauge metric
 	EmptyQWeight = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -28,6 +29,7 @@ func init() {
 
 // StartMetricsServer starts the Prometheus metrics server using the custom registry
 func StartMetricsServer() {
+	log.Println("🚀 Metrics server is running on port 2112")
 	http.Handle("/metrics", promhttp.HandlerFor(customRegistry, promhttp.HandlerOpts{}))
 	http.ListenAndServe(":2112", nil)
 }
