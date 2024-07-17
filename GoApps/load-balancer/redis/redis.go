@@ -53,6 +53,8 @@ func InitializeServices(rdb *redis.Client) {
 		if err := saveServiceToRedis(rdb, service); err != nil {
 			log.Fatalf("❌ Error saving service %s to Redis: %v", service.Name, err)
 		}
+		// Set initial metric values
+		metrics.EmptyQWeight.WithLabelValues(service.Name).Set(float64(service.EmptyQWeight))
 	}
 	LastUpdateTime = time.Now()
 	log.Println("✅ Services initialized")
