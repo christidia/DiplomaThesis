@@ -23,8 +23,8 @@ var (
 
 func main() {
 	// Set the default registry to the custom registry
-	prometheus.DefaultRegisterer = metrics.customRegistry
-	prometheus.DefaultGatherer = metrics.customRegistry
+	prometheus.DefaultRegisterer = metrics.CustomRegistry
+	prometheus.DefaultGatherer = metrics.CustomRegistry
 
 	// Load configurations
 	config.LoadConfig()

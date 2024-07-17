@@ -9,7 +9,7 @@ import (
 )
 
 // Define a custom Prometheus registry
-var customRegistry = prometheus.NewRegistry()
+var CustomRegistry = prometheus.NewRegistry()
 
 var (
 	// Define the Prometheus gauge metric
@@ -24,12 +24,12 @@ var (
 
 func init() {
 	// Register the custom metric with the custom registry
-	customRegistry.MustRegister(EmptyQWeight)
+	CustomRegistry.MustRegister(EmptyQWeight)
 }
 
 // StartMetricsServer starts the Prometheus metrics server using the custom registry
 func StartMetricsServer() {
 	log.Println("🚀 Metrics server is running on port 2112")
-	http.Handle("/metrics", promhttp.HandlerFor(customRegistry, promhttp.HandlerOpts{}))
+	http.Handle("/metrics", promhttp.HandlerFor(CustomRegistry, promhttp.HandlerOpts{}))
 	http.ListenAndServe(":2112", nil)
 }
