@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"load-balancer/config"
-	rdb "load-balancer/redis"
+	rdb "load-balancer/redis" // Alias the custom redis package
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
-	redis "github.com/go-redis/redis/v8"
+	redis "github.com/go-redis/redis/v8" // Alias the Go Redis package
 )
 
 var (
@@ -116,5 +116,18 @@ func StartAdmissionRateUpdater(rdbClient *redis.Client) {
 
 	for currentTime := range ticker.C {
 		rdb.UpdateAdmissionRates(rdbClient, currentTime)
+	}
+}
+
+func init() {
+	config.LoadConfig()
+
+	switch config.RoutingAlgorithm {
+	case "AIMD":
+		SelectedAlgorithm = &AIMDRoutingAlgorithm{}
+	case "RoundRobin":
+		SelectedAlgorithm = &RoundRobinRoutingAlgorithm{}
+	default:
+		log.Fatalf("❌ Invalid or unsupported ROUTING_ALGORITHM value: %s", config.RoutingAlgorithm)
 	}
 }

@@ -16,6 +16,7 @@ var (
 	CheckInterval         time.Duration
 	AdmissionRateInterval time.Duration
 	NumServices           int
+	RoutingAlgorithm      string
 )
 
 func LoadConfig() {
@@ -61,4 +62,9 @@ func LoadConfig() {
 		log.Fatalf("❌ Invalid NUM_SERVICES value: %v", err)
 	}
 	NumServices = numServices
+
+	RoutingAlgorithm = os.Getenv("ROUTING_ALGORITHM")
+	if RoutingAlgorithm == "" {
+		log.Fatal("❌ ROUTING_ALGORITHM environment variable is not set")
+	}
 }
