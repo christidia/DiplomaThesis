@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -25,6 +26,7 @@ func init() {
 
 // StartMetricsServer starts the Prometheus metrics server
 func StartMetricsServer() {
+	log.Println("🚀 Metrics server is running on port 2112")
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":2112", nil)
 }
