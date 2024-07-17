@@ -105,6 +105,7 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 			if err != nil {
 				log.Printf("❌ Error updating curr_weight for service %s in Redis: %v", service.Name, err)
 			}
+
 		}
 		PrevQueueEmpty = false
 	} else {
@@ -123,6 +124,8 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 
 	for _, service := range ServicesMap {
 		log.Printf("📈 Updated admission rate for %s: %d", service.Name, service.CurrWeight)
+		// expose metrics
+		metrics.EmptyQWeight.WithLabelValues(service.Name).Set(float64(service.EmptyQWeight))
 	}
 }
 
