@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"load-balancer/config"
+	"load-balancer/metrics"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -146,6 +147,9 @@ func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 			if err != nil {
 				log.Printf("❌ Error updating emptyq_weight for service %s in Redis: %v", service.Name, err)
 			}
+
+			// Update the Prometheus metric
+			metrics.EmptyQWeight.WithLabelValues(service.Name).Set(float64(service.EmptyQWeight))
 		}
 
 		log.Printf("⚖️ Updated EmptyQWeight for all services: %v\n", ServicesMap)
