@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 var (
 	RedisURL              string
 	RedisPass             string
+	RabbitMQURLhttp       string
 	RabbitMQURL           string
 	RabbitMQUser          string
 	RabbitMQPass          string
@@ -28,8 +30,8 @@ func LoadConfig() {
 	if RedisPass == "" {
 		log.Fatal("❌ REDIS_PASSWORD environment variable is not set")
 	}
-	RabbitMQURL = os.Getenv("RABBITMQ_URL")
-	if RabbitMQURL == "" {
+	RabbitMQURLhttp = os.Getenv("RABBITMQ_URL")
+	if RabbitMQURLhttp == "" {
 		log.Fatal("❌ RABBITMQ_URL environment variable is not set")
 	}
 	RabbitMQUser = os.Getenv("RABBITMQ_USERNAME")
@@ -40,6 +42,12 @@ func LoadConfig() {
 	if RabbitMQPass == "" {
 		log.Fatal("❌ RABBITMQ_PASSWORD environment variable is not set")
 	}
+
+	// Construct RabbitMQ URL with username and password
+	RabbitMQURL = fmt.Sprintf("amqp://%s:%s@rabbitmq.rabbitmq-setup.svc.cluster.local:5672/",
+		RabbitMQUser, RabbitMQPass)
+	log.Printf("🔗 Constructed RabbitMQ URL: %s", RabbitMQURL)
+
 	checkIntervalStr := os.Getenv("CHECK_INTERVAL")
 	if checkIntervalStr == "" {
 		CheckInterval = 500 * time.Millisecond
