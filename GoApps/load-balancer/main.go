@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +13,8 @@ import (
 	"load-balancer/rabbitmq"
 	"load-balancer/redis"
 	"load-balancer/routing"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -54,6 +57,15 @@ func main() {
 	// Start the AMQP channel to continuously poll the queue
 	go func() {
 		rabbitmq.PollQueue(queueName, ch, done)
+	}()
+
+	// Start HTTP server for Prometheus metrics
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		log.Println("🚀 Metrics server is running on port 2112")
+		if err := http.ListenAndServe(":2112", nil); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("❌ Could not listen on port 2112: %v\n", err)
+		}
 	}()
 
 	// Handle graceful shutdown
