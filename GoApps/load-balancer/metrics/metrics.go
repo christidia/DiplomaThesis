@@ -29,7 +29,7 @@ func init() {
 
 // StartMetricsServer starts the Prometheus metrics server using the custom registry
 func StartMetricsServer() {
-	log.Println("🚀 Metrics server is running on port 2112")
-	http.Handle("/metrics", promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{}))
-	http.ListenAndServe(":2112", nil)
+	log.Println("🚀Starting metrics server on :2112")
+	http.Handle("/metrics", promhttp.HandlerFor(CustomRegistry, promhttp.HandlerOpts{}))
+	log.Fatal(http.ListenAndServe(":2112", nil))
 }
