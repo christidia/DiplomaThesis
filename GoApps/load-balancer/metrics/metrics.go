@@ -8,9 +8,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// Define a custom Prometheus registry
-var CustomRegistry = prometheus.NewRegistry()
-
 var (
 	// Define the Prometheus gauge metric
 	EmptyQWeight = prometheus.NewGaugeVec(
@@ -22,14 +19,16 @@ var (
 	)
 )
 
-func init() {
-	// Register the custom metric with the custom registry
-	CustomRegistry.MustRegister(EmptyQWeight)
-}
-
 // StartMetricsServer starts the Prometheus metrics server using the custom registry
 func StartMetricsServer() {
+	CustomRegistry := prometheus.NewRegistry()
+	// Set the default registry to the custom registry
+	prometheus.DefaultRegisterer = CustomRegistry
+	prometheus.DefaultGatherer = CustomRegistry
+
+	CustomRegistry.MustRegister(EmptyQWeight)
+
 	log.Println("🚀Starting metrics server on :2112")
-	http.Handle("/metrics", promhttp.HandlerFor(CustomRegistry, promhttp.HandlerOpts{}))
+	http.Handle("/metrics", promhttp.HandlerFor(CustomRegistry, promhttp.HandlerOpts{EnableOpenMetrics: false}))
 	log.Fatal(http.ListenAndServe(":2112", nil))
 }
