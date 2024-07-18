@@ -96,34 +96,21 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 	AdmissionRatesMutex.Lock()
 	defer AdmissionRatesMutex.Unlock()
 
-	if PrevQueueEmpty {
-		for _, service := range ServicesMap {
-			service.CurrWeight = int(float64(service.Beta) * float64(service.EmptyQWeight))
-			err := rdb.HSet(ctx, ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
-			if err != nil {
-				log.Printf("❌ Error updating curr_weight for service %s in Redis: %v", service.Name, err)
-			}
-
-		}
-		PrevQueueEmpty = false
-	} else {
-		elapsedTime := time.Since(LastUpdateTime).Seconds()
-		if elapsedTime >= 0.5 {
-			for _, service := range ServicesMap {
-				service.CurrWeight += service.Alpha * int(elapsedTime)
-				err := rdb.HSet(ctx, ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
-				if err != nil {
-					log.Printf("❌ Error updating curr_weight for service %s in Redis: %v", service.Name, err)
-				}
-			}
-			LastUpdateTime = currentTime
-		}
+	tk, err := rdb.Get(ctx, TkKey).Int64()
+	if err != nil {
+		log.Printf("❌ Error retrieving 'tk' value from Redis: %v", err)
+		return
 	}
 
+	elapsedTime := currentTime.Sub(time.Unix(tk, 0)).Seconds()
+
 	for _, service := range ServicesMap {
+		service.CurrWeight = int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)
+		err := rdb.HSet(ctx, ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
+		if err != nil {
+			log.Printf("❌ Error updating curr_weight for service %s in Redis: %v", service.Name, err)
+		}
 		log.Printf("📈 Updated admission rate for %s: %d", service.Name, service.CurrWeight)
-		// expose metrics
-		// metrics.EmptyQWeight.WithLabelValues(service.Name).Set(float64(service.EmptyQWeight))
 	}
 }
 
@@ -139,6 +126,7 @@ func updateTkInRedis(rdb *redis.Client, currentTime time.Time) {
 
 func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 	if !PrevQueueEmpty {
+		log.Println("🛠️ Starting updateEmptyQWeightRoutine")
 		updateTkInRedis(rdb, currentTime)
 
 		AdmissionRatesMutex.Lock()
@@ -156,14 +144,12 @@ func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 		}
 
 		log.Printf("⚖️ Updated EmptyQWeight for all services: %v\n", ServicesMap)
-		PrevQueueEmpty = true
 	} else {
 		log.Printf("ℹ️ Queue already empty, no new empty queue event triggered.")
 	}
 }
 
 func UpdateEmptyQWeightRoutine() {
-	log.Println("🛠️ Starting updateEmptyQWeightRoutine")
 	rdb := NewRedisClient()
 	currentTime := time.Now()
 	createEmptyQueueEvent(rdb, currentTime)

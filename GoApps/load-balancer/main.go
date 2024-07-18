@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"load-balancer/config"
 	"load-balancer/events"
@@ -67,13 +66,13 @@ func main() {
 	metrics.InitMetrics()
 	go metrics.StartMetricsServer()
 
-	// Example of updating the metric in a separate goroutine
-	go func() {
-		for {
-			metrics.UpdateMetric("service1", float64(time.Now().Unix()%100))
-			time.Sleep(10 * time.Second)
-		}
-	}()
+	// // Example of updating the metric in a separate goroutine
+	// go func() {
+	// 	for {
+	// 		metrics.UpdateMetric("service1", float64(time.Now().Unix()%100))
+	// 		time.Sleep(10 * time.Second)
+	// 	}
+	// }()
 
 	// Handle graceful shutdown
 	signalChan := make(chan os.Signal, 1)
