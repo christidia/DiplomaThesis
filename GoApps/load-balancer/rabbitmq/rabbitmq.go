@@ -79,8 +79,8 @@ func PollQueue(queueName string, ch *amqp.Channel, done chan bool) {
 				log.Printf("❌ Error checking queue: %v\n", err)
 			} else {
 				log.Printf("📋 Queue %s has %d messages\n", queueName, messageCount)
-				if messageCount == 0 && !redis.PrevQueueEmpty {
-					log.Printf("📭 Queue %s is now empty\n", queueName)
+				if messageCount == 0 {
+					//log.Printf("📭 Queue %s is now empty\n", queueName)
 					redis.PrevQueueEmpty = true
 					redis.UpdateEmptyQWeightRoutine()
 				} else if messageCount > 0 {
