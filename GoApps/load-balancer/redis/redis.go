@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"load-balancer/config"
+	"load-balancer/metrics"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -52,8 +53,6 @@ func InitializeServices(rdb *redis.Client) {
 		if err := saveServiceToRedis(rdb, service); err != nil {
 			log.Fatalf("❌ Error saving service %s to Redis: %v", service.Name, err)
 		}
-		// // Set initial metric values
-		// metrics.EmptyQWeight.WithLabelValues(service.Name).Set(float64(service.EmptyQWeight))
 	}
 	LastUpdateTime = time.Now()
 	log.Println("✅ Services initialized")
@@ -78,7 +77,7 @@ func keyExists(rdb *redis.Client, key string) (bool, error) {
 	return val == 1, nil
 }
 
-func initializeTkIfNotExists(rdb *redis.Client) error {
+func InitializeTkIfNotExists(rdb *redis.Client) error {
 	exists, err := keyExists(rdb, TkKey)
 	if err != nil {
 		return err
@@ -153,7 +152,7 @@ func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 			}
 
 			// Update the Prometheus metric
-			// metrics.EmptyQWeight.WithLabelValues(service.Name).Set(float64(service.EmptyQWeight))
+			metrics.UpdateMetric(service.Name, float64(service.EmptyQWeight))
 		}
 
 		log.Printf("⚖️ Updated EmptyQWeight for all services: %v\n", ServicesMap)

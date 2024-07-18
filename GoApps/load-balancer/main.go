@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -23,8 +24,16 @@ func main() {
 	// Initialize Redis client
 	rdb := redis.NewRedisClient()
 
+	// Initialize 'tk' value in Redis
+	err := redis.InitializeTkIfNotExists(rdb)
+	if err != nil {
+		log.Fatalf("❌ Error initializing value of 'tk' in Redis: %v", err)
+	}
+	fmt.Println("✅ Value of 'tk' initialized in Redis")
+
 	// Initialize services and other components
 	redis.InitializeServices(rdb)
+
 	go events.StartReceiver()
 	go routing.StartAdmissionRateUpdater(rdb)
 
