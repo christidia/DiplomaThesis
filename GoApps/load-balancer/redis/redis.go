@@ -141,6 +141,7 @@ func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 
 			// Update the Prometheus metric
 			metrics.UpdateMetric(service.Name, float64(service.EmptyQWeight))
+			PrevQueueEmpty = true
 		}
 
 		log.Printf("⚖️ Updated EmptyQWeight for all services: %v\n", ServicesMap)
