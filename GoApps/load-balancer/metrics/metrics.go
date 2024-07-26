@@ -67,7 +67,7 @@ func FetchReplicas() {
 	metrics := make(map[string]float64)
 
 	// Prometheus query for autoscaler_actual_pods
-	prometheusURL := "http://prometheus-kube-prometheus-prometheus.prometheus:9090"
+	prometheusURL := "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
 	query := `sum(autoscaler_actual_pods{namespace_name="rabbitmq-setup", configuration_name=~"service.*"})`
 
 	// Fetch and store metrics using Prometheus query
