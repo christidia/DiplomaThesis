@@ -104,6 +104,10 @@ func display(event cloudevents.Event) {
 }
 
 func main() {
+	// Initialize and start the metrics server
+	metrics.InitMetrics()
+	go metrics.StartMetricsServer()
+
 	run(context.Background())
 }
 
