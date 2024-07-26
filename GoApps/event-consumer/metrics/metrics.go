@@ -7,6 +7,7 @@ import (
 	"consumer/config"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -18,6 +19,15 @@ var (
 		Help: "Number of requests weighting to be processed in internal queue.",
 	}, []string{"service"})
 )
+
+func init() {
+	// Unregister default collectors
+	prometheus.Unregister(collectors.NewGoCollector())
+	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+
+	// Register only your custom metric
+	prometheus.MustRegister(QueuedRequests)
+}
 
 func StartMetricsServer() {
 	mux := http.NewServeMux()
