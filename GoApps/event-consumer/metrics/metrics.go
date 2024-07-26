@@ -32,7 +32,7 @@ func StartMetricsServer() {
 
 func InitMetrics() {
 	// Register any static metrics here if needed
-	QueuedRequests.WithLabelValues("serviceName").Set(0)
+	QueuedRequests.WithLabelValues(serviceName).Set(0)
 }
 
 func UpdateMetric(value float64) {
