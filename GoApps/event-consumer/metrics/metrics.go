@@ -25,8 +25,7 @@ func init() {
 	prometheus.Unregister(collectors.NewGoCollector())
 	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
-	// Register only your custom metric
-	prometheus.MustRegister(QueuedRequests)
+	// QueuedRequests is already registered by promauto, no need to register it again
 }
 
 func StartMetricsServer() {
