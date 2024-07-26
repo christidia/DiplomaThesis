@@ -65,7 +65,6 @@ func main() {
 	// Initialize and start the metrics server
 	metrics.InitMetrics()
 	go metrics.StartMetricsServer()
-	go metrics.FetchAndPrintMetrics()
 
 	// Handle graceful shutdown
 	signalChan := make(chan os.Signal, 1)
