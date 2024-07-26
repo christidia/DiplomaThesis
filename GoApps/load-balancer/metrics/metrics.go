@@ -52,12 +52,12 @@ func UpdateMetric(service string, value float64) {
 }
 
 func FetchQdReqs() {
+	services := []string{"service1", "service2", "service3"}
+	metricType := "queued_requests"
 	metrics := make(map[string]float64)
-	url := "http://consumer-metrics.rabbitmq-setup.svc.cluster.local:9095/metrics"
-	prefix := "queued_requests"
 
 	// Fetch and store metrics
-	fetchAndStoreMetrics(url, prefix, metrics)
+	fetchAndStoreMetrics(services, metricType, metrics)
 
 	// Print the metrics
 	printMetrics(metrics, "📥 Queued Requests")
@@ -76,41 +76,41 @@ func FetchReplicas() {
 	printMetrics(metrics, "🖇️ Number of Replicas")
 }
 
-// Function to fetch and store metrics
-func fetchAndStoreMetrics(url string, prefix string, metrics map[string]float64) {
-	resp, err := http.Get(url)
-	if err != nil {
-		log.Printf("Error querying metrics: %v", err)
-		return
-	}
-	defer resp.Body.Close()
+// Function to fetch and store metrics for all services
+func fetchAndStoreMetrics(services []string, metricType string, metrics map[string]float64) {
+	for _, service := range services {
+		url := fmt.Sprintf("http://%s-metrics.rabbitmq-setup.svc.cluster.local:9095/metrics", service)
 
-	scanner := bufio.NewScanner(resp.Body)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, prefix) {
-			// Example format: prefix{service="service1"} 2
-			parts := strings.Split(line, " ")
-			if len(parts) == 2 {
-				labelValuePair := strings.TrimPrefix(parts[0], prefix+"{")
-				labelValuePair = strings.TrimSuffix(labelValuePair, "}")
-				labelParts := strings.Split(labelValuePair, "=")
-				if len(labelParts) == 2 {
-					service := strings.Trim(labelParts[1], "\"")
-					valueStr := parts[1]
+		resp, err := http.Get(url)
+		if err != nil {
+			log.Printf("Error querying metrics for %s: %v", service, err)
+			continue
+		}
+
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, metricType) {
+				// Parse the metric value
+				parts := strings.Fields(line)
+				if len(parts) >= 2 {
+					valueStr := parts[len(parts)-1]
 					value, err := strconv.ParseFloat(valueStr, 64)
 					if err != nil {
-						log.Printf("Error parsing value for service %s: %v", service, err)
-						continue
+						log.Printf("Error parsing metric value for %s: %v", service, err)
+					} else {
+						metrics[service] = value
+						log.Printf("📥 Queued Requests for %s: %f", service, value)
 					}
-					metrics[service] = value
 				}
 			}
 		}
-	}
 
-	if err := scanner.Err(); err != nil {
-		log.Printf("Error reading metrics response: %v", err)
+		if err := scanner.Err(); err != nil {
+			log.Printf("Error reading metrics response for %s: %v", service, err)
+		}
+
+		resp.Body.Close()
 	}
 }
 
