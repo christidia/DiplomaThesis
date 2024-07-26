@@ -16,6 +16,7 @@ import (
 )
 
 var (
+	services     = []string{"service1", "service2", "service3"}
 	EmptyQWeight = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "emptyqweight",
 		Help: "Admission rate at last empty queue event.",
@@ -52,7 +53,6 @@ func UpdateMetric(service string, value float64) {
 }
 
 func FetchQdReqs() {
-	services := []string{"service1", "service2", "service3"}
 	metricType := "queued_requests"
 	metrics := make(map[string]float64)
 
@@ -67,11 +67,10 @@ func FetchReplicas() {
 	metrics := make(map[string]float64)
 
 	// Prometheus query for autoscaler_actual_pods
-	prometheusURL := "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
 	query := `sum(autoscaler_actual_pods{namespace_name="rabbitmq-setup", configuration_name=~"service.*"})`
 
 	// Fetch and store metrics using Prometheus query
-	fetchAndStorePrometheusQueryMetrics(prometheusURL, query, metrics)
+	fetchAndStorePrometheusMetrics(query, metrics)
 
 	printMetrics(metrics, "🖇️ Number of Replicas")
 }
@@ -114,42 +113,50 @@ func fetchAndStoreMetrics(services []string, metricType string, metrics map[stri
 	}
 }
 
-// Function to fetch and store metrics from a Prometheus query
-func fetchAndStorePrometheusQueryMetrics(url string, query string, metrics map[string]float64) {
-	queryURL := fmt.Sprintf("%s/api/v1/query?query=%s", url, query)
-	resp, err := http.Get(queryURL)
+type PrometheusResponse struct {
+	Data struct {
+		Result []struct {
+			Metric struct {
+				ConfigurationName string `json:"configuration_name"`
+			} `json:"metric"`
+			Value []interface{} `json:"value"`
+		} `json:"result"`
+	} `json:"data"`
+}
+
+// Function to fetch and store Prometheus metrics for all services
+func fetchAndStorePrometheusMetrics(query string, metrics map[string]float64) {
+	url := fmt.Sprintf("http://prometheus-kube-prometheus-prometheus.prometheus:9090/api/v1/query?query=%s", query)
+
+	resp, err := http.Get(url)
 	if err != nil {
 		log.Printf("Error querying Prometheus: %v", err)
 		return
 	}
 	defer resp.Body.Close()
 
-	var response struct {
-		Data struct {
-			Result []struct {
-				Metric struct {
-					ConfigurationName string `json:"configuration_name"`
-				} `json:"metric"`
-				Value []interface{} `json:"value"`
-			} `json:"result"`
-		} `json:"data"`
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
+	var response PrometheusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		log.Printf("Error decoding Prometheus response: %v", err)
 		return
 	}
 
 	for _, result := range response.Data.Result {
 		service := result.Metric.ConfigurationName
-		valueStr := result.Value[1].(string)
-		value, err := strconv.ParseFloat(valueStr, 64)
-		if err != nil {
-			log.Printf("Error parsing value for service %s: %v", service, err)
-			continue
+		if len(result.Value) >= 2 {
+			valueStr, ok := result.Value[1].(string)
+			if !ok {
+				log.Printf("Error parsing metric value for %s: %v", service, err)
+				continue
+			}
+			value, err := strconv.ParseFloat(valueStr, 64)
+			if err != nil {
+				log.Printf("Error converting metric value for %s: %v", service, err)
+				continue
+			}
+			metrics[service] = value
+			log.Printf("📊 Number of Replicas for %s: %f", service, value)
 		}
-		metrics[service] = value
 	}
 }
 
