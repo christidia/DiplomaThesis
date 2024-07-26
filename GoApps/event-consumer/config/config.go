@@ -32,7 +32,7 @@ func LoadConfig() {
 		NumWorkers = 4 // default number of workers
 	}
 
-	ServiceName := os.Getenv("SERVICE_NAME")
+	ServiceName = os.Getenv("SERVICE_NAME")
 	if ServiceName == "" {
 		log.Println("⚠️ Service Name Environmental Var is not declared.")
 	}
