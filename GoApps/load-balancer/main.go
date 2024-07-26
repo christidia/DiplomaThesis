@@ -65,14 +65,7 @@ func main() {
 	// Initialize and start the metrics server
 	metrics.InitMetrics()
 	go metrics.StartMetricsServer()
-
-	// // Example of updating the metric in a separate goroutine
-	// go func() {
-	// 	for {
-	// 		metrics.UpdateMetric("service1", float64(time.Now().Unix()%100))
-	// 		time.Sleep(10 * time.Second)
-	// 	}
-	// }()
+	go metrics.FetchAndPrintMetrics()
 
 	// Handle graceful shutdown
 	signalChan := make(chan os.Signal, 1)

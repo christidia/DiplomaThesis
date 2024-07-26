@@ -1,8 +1,12 @@
 package metrics
 
 import (
+	"bufio"
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -37,4 +41,33 @@ func InitMetrics() {
 func UpdateMetric(service string, value float64) {
 	EmptyQWeight.WithLabelValues(service).Set(value)
 	log.Printf("Updated EmptyQWeight for %s to %f", service, value)
+}
+
+// Function to fetch and print metrics every 5 seconds
+func FetchAndPrintMetrics() {
+	url := "http://consumer-metrics.rabbitmq-setup.svc.cluster.local:9095/metrics"
+
+	for {
+		resp, err := http.Get(url)
+		if err != nil {
+			log.Printf("Error querying metrics: %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "queued_requests") {
+				fmt.Println(line)
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			log.Printf("Error reading metrics response: %v", err)
+		}
+
+		resp.Body.Close()
+		time.Sleep(5 * time.Second)
+	}
 }
