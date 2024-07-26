@@ -99,8 +99,8 @@ func startProcessor(workerID int, wg *sync.WaitGroup) {
 
 func display(event cloudevents.Event) {
 	config.RequestQueue <- event
-	metrics.QueuedRequests.Set(float64(len(config.RequestQueue)))
 	log.Println("📥 Event queued for processing")
+	metrics.UpdateMetric(float64(len(config.RequestQueue)))
 }
 
 func main() {
@@ -166,4 +166,3 @@ func requestLoggingMiddleware(enabled bool) func(next http.Handler) http.Handler
 		})
 	}
 }
-
