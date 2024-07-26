@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	serviceName    = config.ServiceName
+	serviceName    string
 	QueuedRequests = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "queued_requests",
 		Help: "Number of requests weighting to be processed in internal queue.",
@@ -31,8 +31,10 @@ func StartMetricsServer() {
 }
 
 func InitMetrics() {
-	// Register any static metrics here if needed
+	serviceName = config.ServiceName
 	QueuedRequests.WithLabelValues(serviceName).Set(0)
+	log.Printf("Metrics for %s initialized", serviceName)
+
 }
 
 func UpdateMetric(value float64) {
