@@ -104,6 +104,8 @@ func display(event cloudevents.Event) {
 }
 
 func main() {
+	config.LoadConfig()
+
 	// Initialize and start the metrics server
 	metrics.InitMetrics()
 	go metrics.StartMetricsServer()
@@ -112,7 +114,6 @@ func main() {
 }
 
 func run(ctx context.Context) {
-	config.LoadConfig()
 
 	// Check if request logging is enabled
 	requestLoggingEnabled, _ := strconv.ParseBool(os.Getenv("REQUEST_LOGGING_ENABLED"))
