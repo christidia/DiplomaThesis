@@ -15,6 +15,7 @@ var (
 	RequestQueue          chan cloudevents.Event
 	NumWorkers            int
 	RequestLoggingEnabled bool
+	ServiceName           string
 )
 
 func LoadConfig() {
@@ -29,6 +30,11 @@ func LoadConfig() {
 	NumWorkers, err = strconv.Atoi(numWorkersStr)
 	if err != nil || NumWorkers < 1 {
 		NumWorkers = 4 // default number of workers
+	}
+
+	ServiceName := os.Getenv("SERVICE_NAME")
+	if ServiceName == "" {
+		log.Println("⚠️ Service Name Environmental Var is not declared.")
 	}
 
 	RequestLoggingEnabled, _ = strconv.ParseBool(os.Getenv("REQUEST_LOGGING_ENABLED"))

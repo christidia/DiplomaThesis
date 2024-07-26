@@ -12,6 +12,7 @@ import (
 
 	"consumer/config"
 	"consumer/logging"
+	"consumer/metrics"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/wimspaargaren/yolov3"
@@ -98,6 +99,7 @@ func startProcessor(workerID int, wg *sync.WaitGroup) {
 
 func display(event cloudevents.Event) {
 	config.RequestQueue <- event
+	metrics.QueuedRequests.Set(float64(len(config.RequestQueue)))
 	log.Println("📥 Event queued for processing")
 }
 
