@@ -70,16 +70,10 @@ func FetchQdReqs() map[string]int {
 	return metrics
 }
 
-func FetchReplicas() {
-	metrics := make(map[string]int)
-
-	// // Fetch and store metrics using Prometheus query
-	// fetchAndStorePrometheusMetrics(metrics)
-	for _, serviceName := range services {
-		replicas := FetchReplicaNum(serviceName)
-		metrics[serviceName] = replicas
-		log.Printf("🖇️ Number of Replicas for %s: %d", serviceName, replicas)
-	}
+func FetchReplicas(service string) int {
+	replicas := FetchReplicaNum(service)
+	log.Printf("🖇️ Number of Replicas for %s: %d", service, replicas)
+	return replicas
 }
 
 // Function to fetch and store metrics for all services
@@ -190,8 +184,9 @@ func CalculateGamma() {
 	for _, service := range db.ServicesMap {
 		qWeight := db.EmptyQWeights[service.Name]
 		queuedRequests := queued_requests[service.Name]
+		replicas := float64(FetchReplicaNum(service.Name))
 
-		gamma := (qWeight*service.Beta + math.Sqrt(float64(queuedRequests)*2*float64(service.Alpha)))
+		gamma := (qWeight*service.Beta + math.Sqrt(replicas*float64(queuedRequests)*2*float64(service.Alpha)))
 		log.Printf("🔢 Gamma for %s: %f", service.Name, gamma)
 	}
 }

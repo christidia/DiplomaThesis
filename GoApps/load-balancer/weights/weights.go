@@ -38,7 +38,7 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 	elapsedTime := currentTime.Sub(time.Unix(tk, 0)).Seconds()
 
 	for _, service := range db.ServicesMap {
-		service.CurrWeight = int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)
+		service.CurrWeight = int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
 		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
 		if err != nil {
 			log.Printf("❌ Error updating curr_weight for service %s in Redis: %v", service.Name, err)
@@ -75,8 +75,7 @@ func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 			// Update the Prometheus metric
 			metrics.UpdateMetric(service.Name, float64(service.EmptyQWeight))
 			db.EmptyQWeights[service.Name] = float64(service.EmptyQWeight)
-			metrics.FetchQdReqs()
-			metrics.FetchReplicas()
+			metrics.CalculateGamma()
 			db.PrevQueueEmpty = true
 		}
 
