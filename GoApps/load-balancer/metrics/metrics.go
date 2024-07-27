@@ -3,12 +3,10 @@ package metrics
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -22,6 +20,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"load-balancer/db"
 )
 
 var (
@@ -61,12 +61,13 @@ func UpdateMetric(service string, value float64) {
 	log.Printf("Updated EmptyQWeight for %s to %f", service, value)
 }
 
-func FetchQdReqs() {
+func FetchQdReqs() map[string]int {
 	metricType := "queued_requests"
 	metrics := make(map[string]int)
 
 	// Fetch and store metrics
 	fetchAndStoreMetrics(services, metricType, metrics)
+	return metrics
 }
 
 func FetchReplicas() {
@@ -181,6 +182,20 @@ func homeDir() string {
 	return os.Getenv("USERPROFILE") // windows
 }
 
+// Function to calculate gamma for each service
+func CalculateGamma() {
+	queued_requests := FetchQdReqs()
+
+	// Calculate gamma for each service
+	for _, service := range db.ServicesMap {
+		qWeight := db.EmptyQWeights[service.Name]
+		queuedRequests := queued_requests[service.Name]
+
+		gamma := (qWeight*service.Beta + math.Sqrt(float64(queuedRequests)*2*float64(service.Alpha)))
+		log.Printf("🔢 Gamma for %s: %f", service.Name, gamma)
+	}
+}
+
 // // Function to fetch and store metrics for all services
 // func fetchAndStoreMetrics(services []string, metricType string, metrics map[string]int) {
 // 	for _, service := range services {
@@ -219,58 +234,58 @@ func homeDir() string {
 // 	}
 // }
 
-// Function to query Prometheus and extract numerical value
-func queryAndExtract(queryURL string) (string, error) {
-	client := &http.Client{}
-	resp, err := client.Get(queryURL)
-	if err != nil {
-		return "", fmt.Errorf("error querying Prometheus: %v", err)
-	}
-	defer resp.Body.Close()
+// // Function to query Prometheus and extract numerical value
+// func queryAndExtract(queryURL string) (string, error) {
+// 	client := &http.Client{}
+// 	resp, err := client.Get(queryURL)
+// 	if err != nil {
+// 		return "", fmt.Errorf("error querying Prometheus: %v", err)
+// 	}
+// 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("error reading response body: %v", err)
-	}
+// 	body, err := ioutil.ReadAll(resp.Body)
+// 	if err != nil {
+// 		return "", fmt.Errorf("error reading response body: %v", err)
+// 	}
 
-	var response struct {
-		Data struct {
-			Result []struct {
-				Value []interface{} `json:"value"`
-			} `json:"result"`
-		} `json:"data"`
-	}
+// 	var response struct {
+// 		Data struct {
+// 			Result []struct {
+// 				Value []interface{} `json:"value"`
+// 			} `json:"result"`
+// 		} `json:"data"`
+// 	}
 
-	if err := json.Unmarshal(body, &response); err != nil {
-		return "", fmt.Errorf("error parsing JSON response: %v", err)
-	}
+// 	if err := json.Unmarshal(body, &response); err != nil {
+// 		return "", fmt.Errorf("error parsing JSON response: %v", err)
+// 	}
 
-	if len(response.Data.Result) > 0 {
-		value := response.Data.Result[0].Value[1].(string) // Assuming the value is in the second position of the array
-		return value, nil
-	}
+// 	if len(response.Data.Result) > 0 {
+// 		value := response.Data.Result[0].Value[1].(string) // Assuming the value is in the second position of the array
+// 		return value, nil
+// 	}
 
-	return "", fmt.Errorf("no result found in Prometheus response")
-}
+// 	return "", fmt.Errorf("no result found in Prometheus response")
+// }
 
-// Function to fetch and store Prometheus metrics for all services
-func fetchAndStorePrometheusMetrics(metrics map[string]int) {
-	for _, serviceName := range services {
-		promQuery := fmt.Sprintf("autoscaler_actual_pods{namespace_name=\"rabbitmq-setup\", configuration_name=\"%s\"}", serviceName)
-		url := fmt.Sprintf("http://prometheus-kube-prometheus-prometheus.monitoring:9090/api/v1/query?query=%s", url.QueryEscape(promQuery))
+// // Function to fetch and store Prometheus metrics for all services
+// func fetchAndStorePrometheusMetrics(metrics map[string]int) {
+// 	for _, serviceName := range services {
+// 		promQuery := fmt.Sprintf("autoscaler_actual_pods{namespace_name=\"rabbitmq-setup\", configuration_name=\"%s\"}", serviceName)
+// 		url := fmt.Sprintf("http://prometheus-kube-prometheus-prometheus.monitoring:9090/api/v1/query?query=%s", url.QueryEscape(promQuery))
 
-		value, err := queryAndExtract(url)
-		if err != nil {
-			log.Printf("Error querying Prometheus for service %s: %v", serviceName, err)
-			continue
-		}
+// 		value, err := queryAndExtract(url)
+// 		if err != nil {
+// 			log.Printf("Error querying Prometheus for service %s: %v", serviceName, err)
+// 			continue
+// 		}
 
-		valInt, err := strconv.Atoi(value)
-		if err != nil {
-			log.Printf("Error converting metric value for %s: %v", serviceName, err)
-			continue
-		}
-		metrics[serviceName] = valInt
-		log.Printf("🖇️ Number of Replicas for %s: %d", serviceName, valInt)
-	}
-}
+// 		valInt, err := strconv.Atoi(value)
+// 		if err != nil {
+// 			log.Printf("Error converting metric value for %s: %v", serviceName, err)
+// 			continue
+// 		}
+// 		metrics[serviceName] = valInt
+// 		log.Printf("🖇️ Number of Replicas for %s: %d", serviceName, valInt)
+// 	}
+// }

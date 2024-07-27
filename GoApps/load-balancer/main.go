@@ -8,11 +8,12 @@ import (
 	"syscall"
 
 	"load-balancer/config"
+	"load-balancer/db"
 	"load-balancer/events"
 	"load-balancer/metrics"
 	"load-balancer/rabbitmq"
-	"load-balancer/redis"
 	"load-balancer/routing"
+	"load-balancer/weights"
 )
 
 func main() {
@@ -21,17 +22,17 @@ func main() {
 	config.LoadConfig()
 
 	// Initialize Redis client
-	rdb := redis.NewRedisClient()
+	rdb := db.NewRedisClient()
 
 	// Initialize 'tk' value in Redis
-	err := redis.InitializeTkIfNotExists(rdb)
+	err := weights.InitializeTkIfNotExists(rdb)
 	if err != nil {
 		log.Fatalf("❌ Error initializing value of 'tk' in Redis: %v", err)
 	}
 	fmt.Println("✅ Value of 'tk' initialized in Redis")
 
 	// Initialize services and other components
-	redis.InitializeServices(rdb)
+	db.InitializeServices(rdb)
 
 	go events.StartReceiver()
 	go routing.StartAdmissionRateUpdater(rdb)

@@ -6,7 +6,8 @@ import (
 	"time"
 
 	"load-balancer/config"
-	rdb "load-balancer/redis"
+	"load-balancer/db"
+	"load-balancer/weights"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	redis "github.com/go-redis/redis/v8"
@@ -18,7 +19,7 @@ var (
 )
 
 type RoutingAlgorithm interface {
-	RouteEvent(event cloudevents.Event, servicesMap map[string]*rdb.Service)
+	RouteEvent(event cloudevents.Event, servicesMap map[string]*db.Service)
 }
 
 func StartAdmissionRateUpdater(rdbClient *redis.Client) {
@@ -26,7 +27,7 @@ func StartAdmissionRateUpdater(rdbClient *redis.Client) {
 	defer ticker.Stop()
 
 	for currentTime := range ticker.C {
-		rdb.UpdateAdmissionRates(rdbClient, currentTime)
+		weights.UpdateAdmissionRates(rdbClient, currentTime)
 	}
 }
 

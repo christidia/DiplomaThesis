@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	rdb "load-balancer/redis"
+	rdb "load-balancer/db"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 )

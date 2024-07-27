@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"load-balancer/config"
-	"load-balancer/redis"
+	"load-balancer/db"
+	"load-balancer/weights"
 
 	"github.com/parnurzeal/gorequest"
 	"github.com/streadway/amqp"
@@ -81,9 +82,9 @@ func PollQueue(queueName string, ch *amqp.Channel, done chan bool) {
 				log.Printf("📋 Queue %s has %d messages\n", queueName, messageCount)
 				if messageCount == 0 {
 					//log.Printf("📭 Queue %s is now empty\n", queueName)
-					redis.UpdateEmptyQWeightRoutine()
+					weights.UpdateEmptyQWeightRoutine()
 				} else if messageCount > 0 {
-					redis.PrevQueueEmpty = false
+					db.PrevQueueEmpty = false
 				}
 			}
 			time.Sleep(config.CheckInterval)

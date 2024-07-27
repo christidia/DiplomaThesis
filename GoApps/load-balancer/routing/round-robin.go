@@ -3,7 +3,7 @@ package routing
 import (
 	"context"
 	"fmt"
-	rdb "load-balancer/redis"
+	rdb "load-balancer/db"
 	"log"
 	"sync"
 	"time"

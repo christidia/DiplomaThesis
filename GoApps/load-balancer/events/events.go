@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"time"
 
-	rdb "load-balancer/redis"
+	"load-balancer/db"
 	"load-balancer/routing"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -31,5 +31,5 @@ func StartReceiver() {
 }
 
 func Receive(event cloudevents.Event) {
-	routing.SelectedAlgorithm.RouteEvent(event, rdb.ServicesMap)
+	routing.SelectedAlgorithm.RouteEvent(event, db.ServicesMap)
 }
