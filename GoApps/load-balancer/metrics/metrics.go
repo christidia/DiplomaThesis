@@ -126,7 +126,7 @@ type PrometheusResponse struct {
 
 // Function to fetch and store Prometheus metrics for all services
 func fetchAndStorePrometheusMetrics(query string, metrics map[string]float64) {
-	url := fmt.Sprintf("http://prometheus-kube-prometheus-prometheus.prometheus:9090/api/v1/query?query=%s", query)
+	url := fmt.Sprintf("http://prometheus-kube-prometheus-prometheus.monitoring:9090/api/v1/query?query=%s", query)
 
 	resp, err := http.Get(url)
 	if err != nil {
