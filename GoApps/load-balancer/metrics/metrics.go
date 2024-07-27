@@ -68,11 +68,8 @@ func FetchQdReqs() {
 func FetchReplicas() {
 	metrics := make(map[string]float64)
 
-	// Prometheus query for autoscaler_actual_pods
-	query := `sum(autoscaler_actual_pods{namespace_name="rabbitmq-setup", configuration_name=~"service.*"})`
-
 	// Fetch and store metrics using Prometheus query
-	fetchAndStorePrometheusMetrics(query, metrics)
+	fetchAndStorePrometheusMetrics(metrics)
 
 	printMetrics(metrics, "🖇️ Number of Replicas")
 }
@@ -150,10 +147,10 @@ func queryAndExtract(queryURL string) (string, error) {
 }
 
 // Function to fetch and store Prometheus metrics for all services
-func fetchAndStorePrometheusMetrics(query string, metrics map[string]float64) {
+func fetchAndStorePrometheusMetrics(metrics map[string]float64) {
 	for _, serviceName := range services {
 		promQuery := fmt.Sprintf("autoscaler_actual_pods{namespace_name=\"rabbitmq-setup\", configuration_name=\"%s\"}", serviceName)
-		url := fmt.Sprintf("http://prometheus-kube-prometheus-prometheus.prometheus:9090/api/v1/query?query=%s", url.QueryEscape(promQuery))
+		url := fmt.Sprintf("http://prometheus-kube-prometheus-prometheus.monitoring:9090/api/v1/query?query=%s", url.QueryEscape(promQuery))
 
 		value, err := queryAndExtract(url)
 		if err != nil {
