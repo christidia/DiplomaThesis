@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -113,50 +115,59 @@ func fetchAndStoreMetrics(services []string, metricType string, metrics map[stri
 	}
 }
 
-type PrometheusResponse struct {
-	Data struct {
-		Result []struct {
-			Metric struct {
-				ConfigurationName string `json:"configuration_name"`
-			} `json:"metric"`
-			Value []interface{} `json:"value"`
-		} `json:"result"`
-	} `json:"data"`
+// Function to query Prometheus and extract numerical value
+func queryAndExtract(queryURL string) (string, error) {
+	client := &http.Client{}
+	resp, err := client.Get(queryURL)
+	if err != nil {
+		return "", fmt.Errorf("error querying Prometheus: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading response body: %v", err)
+	}
+
+	var response struct {
+		Data struct {
+			Result []struct {
+				Value []interface{} `json:"value"`
+			} `json:"result"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &response); err != nil {
+		return "", fmt.Errorf("error parsing JSON response: %v", err)
+	}
+
+	if len(response.Data.Result) > 0 {
+		value := response.Data.Result[0].Value[1].(string) // Assuming the value is in the second position of the array
+		return value, nil
+	}
+
+	return "", fmt.Errorf("no result found in Prometheus response")
 }
 
 // Function to fetch and store Prometheus metrics for all services
 func fetchAndStorePrometheusMetrics(query string, metrics map[string]float64) {
-	url := fmt.Sprintf("http://prometheus-kube-prometheus-prometheus.monitoring:9090/api/v1/query?query=%s", query)
+	for _, serviceName := range services {
+		promQuery := fmt.Sprintf("autoscaler_actual_pods{namespace_name=\"rabbitmq-setup\", configuration_name=\"%s\"}", serviceName)
+		url := fmt.Sprintf("http://prometheus-kube-prometheus-prometheus.prometheus:9090/api/v1/query?query=%s", url.QueryEscape(promQuery))
 
-	resp, err := http.Get(url)
-	if err != nil {
-		log.Printf("Error querying Prometheus: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	var response PrometheusResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		log.Printf("Error decoding Prometheus response: %v", err)
-		return
-	}
-
-	for _, result := range response.Data.Result {
-		service := result.Metric.ConfigurationName
-		if len(result.Value) >= 2 {
-			valueStr, ok := result.Value[1].(string)
-			if !ok {
-				log.Printf("Error parsing metric value for %s: %v", service, err)
-				continue
-			}
-			value, err := strconv.ParseFloat(valueStr, 64)
-			if err != nil {
-				log.Printf("Error converting metric value for %s: %v", service, err)
-				continue
-			}
-			metrics[service] = value
-			log.Printf("📊 Number of Replicas for %s: %f", service, value)
+		value, err := queryAndExtract(url)
+		if err != nil {
+			log.Printf("Error querying Prometheus for service %s: %v", serviceName, err)
+			continue
 		}
+
+		valFloat, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			log.Printf("Error converting metric value for %s: %v", serviceName, err)
+			continue
+		}
+		metrics[serviceName] = valFloat
+		log.Printf("🖇️ Number of Replicas for %s: %f", serviceName, valFloat)
 	}
 }
 
