@@ -72,8 +72,13 @@ func FetchQdReqs() {
 func FetchReplicas() {
 	metrics := make(map[string]int)
 
-	// Fetch and store metrics using Prometheus query
-	fetchAndStorePrometheusMetrics(metrics)
+	// // Fetch and store metrics using Prometheus query
+	// fetchAndStorePrometheusMetrics(metrics)
+	for _, serviceName := range services {
+		replicas := FetchReplicaNum(serviceName)
+		metrics[serviceName] = replicas
+		log.Printf("🖇️ Number of Replicas for %s: %d", serviceName, replicas)
+	}
 }
 
 // Function to fetch and store metrics for all services
@@ -108,7 +113,7 @@ func fetchAndStoreMetrics(services []string, metricType string, metrics map[stri
 							log.Printf("Error parsing metric value for %s: %v", endpoint, err)
 						} else {
 							totalQueuedRequests += value
-							log.Printf("📥 Queued Requests for %s: %d", endpoint, value)
+							//log.Printf("📥 Queued Requests for %s: %d", endpoint, value)
 						}
 					}
 				}
@@ -124,6 +129,16 @@ func fetchAndStoreMetrics(services []string, metricType string, metrics map[stri
 		metrics[service] = totalQueuedRequests
 		log.Printf("📥 Total Queued Requests for %s: %d", service, totalQueuedRequests)
 	}
+}
+
+// Function to fetch number of replicas of service
+func FetchReplicaNum(service string) int {
+	endpoints, err := fetchServiceEndpoints(service)
+	if err != nil {
+		log.Printf("Error fetching endpoints for %s: %v", service, err)
+		return 0
+	}
+	return len(endpoints)
 }
 
 // Function to fetch service endpoints
