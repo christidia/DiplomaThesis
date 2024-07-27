@@ -2,12 +2,15 @@ package metrics
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -15,6 +18,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
@@ -56,61 +63,146 @@ func UpdateMetric(service string, value float64) {
 
 func FetchQdReqs() {
 	metricType := "queued_requests"
-	metrics := make(map[string]float64)
+	metrics := make(map[string]int)
 
 	// Fetch and store metrics
 	fetchAndStoreMetrics(services, metricType, metrics)
-
-	// Print the metrics
-	printMetrics(metrics, "📥 Queued Requests")
 }
 
 func FetchReplicas() {
-	metrics := make(map[string]float64)
+	metrics := make(map[string]int)
 
 	// Fetch and store metrics using Prometheus query
 	fetchAndStorePrometheusMetrics(metrics)
-
-	printMetrics(metrics, "🖇️ Number of Replicas")
 }
 
 // Function to fetch and store metrics for all services
-func fetchAndStoreMetrics(services []string, metricType string, metrics map[string]float64) {
+func fetchAndStoreMetrics(services []string, metricType string, metrics map[string]int) {
 	for _, service := range services {
-		url := fmt.Sprintf("http://%s-metrics.rabbitmq-setup.svc.cluster.local:9095/metrics", service)
-
-		resp, err := http.Get(url)
+		endpoints, err := fetchServiceEndpoints(service)
 		if err != nil {
-			log.Printf("Error querying metrics for %s: %v", service, err)
+			log.Printf("Error fetching endpoints for %s: %v", service, err)
 			continue
 		}
 
-		scanner := bufio.NewScanner(resp.Body)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.HasPrefix(line, metricType) {
-				// Parse the metric value
-				parts := strings.Fields(line)
-				if len(parts) >= 2 {
-					valueStr := parts[len(parts)-1]
-					value, err := strconv.ParseFloat(valueStr, 64)
-					if err != nil {
-						log.Printf("Error parsing metric value for %s: %v", service, err)
-					} else {
-						metrics[service] = value
-						log.Printf("📥 Queued Requests for %s: %f", service, value)
+		totalQueuedRequests := 0
+
+		for _, endpoint := range endpoints {
+			metricURL := fmt.Sprintf("http://%s:9095/metrics", endpoint)
+			resp, err := http.Get(metricURL)
+			if err != nil {
+				log.Printf("Error querying metrics for %s: %v", endpoint, err)
+				continue
+			}
+
+			scanner := bufio.NewScanner(resp.Body)
+			for scanner.Scan() {
+				line := scanner.Text()
+				if strings.HasPrefix(line, metricType) {
+					// Parse the metric value
+					parts := strings.Fields(line)
+					if len(parts) >= 2 {
+						valueStr := parts[len(parts)-1]
+						value, err := strconv.Atoi(valueStr)
+						if err != nil {
+							log.Printf("Error parsing metric value for %s: %v", endpoint, err)
+						} else {
+							totalQueuedRequests += value
+							log.Printf("📥 Queued Requests for %s: %d", endpoint, value)
+						}
 					}
 				}
 			}
+
+			if err := scanner.Err(); err != nil {
+				log.Printf("Error reading metrics response for %s: %v", endpoint, err)
+			}
+
+			resp.Body.Close()
 		}
 
-		if err := scanner.Err(); err != nil {
-			log.Printf("Error reading metrics response for %s: %v", service, err)
-		}
-
-		resp.Body.Close()
+		metrics[service] = totalQueuedRequests
+		log.Printf("📥 Total Queued Requests for %s: %d", service, totalQueuedRequests)
 	}
 }
+
+// Function to fetch service endpoints
+func fetchServiceEndpoints(service string) ([]string, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		kubeconfig := filepath.Join(
+			homeDir(), ".kube", "config",
+		)
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	pods, err := clientset.CoreV1().Pods("rabbitmq-setup").List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("service=%s,app=event-display", service),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var endpoints []string
+	for _, pod := range pods.Items {
+		endpoints = append(endpoints, pod.Status.PodIP)
+	}
+
+	return endpoints, nil
+}
+
+func homeDir() string {
+	if h := os.Getenv("HOME"); h != "" {
+		return h
+	}
+	return os.Getenv("USERPROFILE") // windows
+}
+
+// // Function to fetch and store metrics for all services
+// func fetchAndStoreMetrics(services []string, metricType string, metrics map[string]int) {
+// 	for _, service := range services {
+// 		url := fmt.Sprintf("http://%s-metrics.rabbitmq-setup.svc.cluster.local:9095/metrics", service)
+
+// 		resp, err := http.Get(url)
+// 		if err != nil {
+// 			log.Printf("Error querying metrics for %s: %v", service, err)
+// 			continue
+// 		}
+
+// 		scanner := bufio.NewScanner(resp.Body)
+// 		for scanner.Scan() {
+// 			line := scanner.Text()
+// 			if strings.HasPrefix(line, metricType) {
+// 				// Parse the metric value
+// 				parts := strings.Fields(line)
+// 				if len(parts) >= 2 {
+// 					valueStr := parts[len(parts)-1]
+// 					value, err := strconv.Atoi(valueStr)
+// 					if err != nil {
+// 						log.Printf("Error parsing metric value for %s: %v", service, err)
+// 					} else {
+// 						metrics[service] = value
+// 						log.Printf("📥 Queued Requests for %s: %d", service, value)
+// 					}
+// 				}
+// 			}
+// 		}
+
+// 		if err := scanner.Err(); err != nil {
+// 			log.Printf("Error reading metrics response for %s: %v", service, err)
+// 		}
+
+// 		resp.Body.Close()
+// 	}
+// }
 
 // Function to query Prometheus and extract numerical value
 func queryAndExtract(queryURL string) (string, error) {
@@ -147,7 +239,7 @@ func queryAndExtract(queryURL string) (string, error) {
 }
 
 // Function to fetch and store Prometheus metrics for all services
-func fetchAndStorePrometheusMetrics(metrics map[string]float64) {
+func fetchAndStorePrometheusMetrics(metrics map[string]int) {
 	for _, serviceName := range services {
 		promQuery := fmt.Sprintf("autoscaler_actual_pods{namespace_name=\"rabbitmq-setup\", configuration_name=\"%s\"}", serviceName)
 		url := fmt.Sprintf("http://prometheus-kube-prometheus-prometheus.monitoring:9090/api/v1/query?query=%s", url.QueryEscape(promQuery))
@@ -158,19 +250,12 @@ func fetchAndStorePrometheusMetrics(metrics map[string]float64) {
 			continue
 		}
 
-		valFloat, err := strconv.ParseFloat(value, 64)
+		valInt, err := strconv.Atoi(value)
 		if err != nil {
 			log.Printf("Error converting metric value for %s: %v", serviceName, err)
 			continue
 		}
-		metrics[serviceName] = valFloat
-		log.Printf("🖇️ Number of Replicas for %s: %f", serviceName, valFloat)
-	}
-}
-
-// Function to print stored metrics
-func printMetrics(metrics map[string]float64, queryType string) {
-	for service, value := range metrics {
-		fmt.Printf("%s for %s: %f\n", queryType, service, value)
+		metrics[serviceName] = valInt
+		log.Printf("🖇️ Number of Replicas for %s: %d", serviceName, valInt)
 	}
 }
