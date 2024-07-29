@@ -82,11 +82,11 @@ func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 			db.EmptyQWeights[service.Name] = float64(service.EmptyQWeight)
 			metrics.UpdateGamma()
 
-			// queue has emptied for the first time
+			// Queue has emptied for the first time
 			db.PrevQueueEmpty = true
 		}
 
-		log.Printf("⚖️ Updated EmptyQWeight for all services: %v\n", db.ServicesMap)
+		log.Printf("⚖️ Updated EmptyQWeight for all services\n")
 	} else {
 		log.Printf("ℹ️ Queue already empty, no new empty queue event triggered.")
 	}
@@ -111,7 +111,41 @@ func normalizeWeights() {
 	}
 
 	normalizationFactor := 100.0 / float64(totalWeight)
+	roundedWeights := make(map[string]int)
+	totalRoundedWeight := 0
+
+	// First pass: normalize and round weights
 	for _, service := range db.ServicesMap {
-		service.CurrWeight = int(float64(service.CurrWeight) * normalizationFactor)
+		normalizedWeight := float64(service.CurrWeight) * normalizationFactor
+		roundedWeight := int(normalizedWeight)
+		roundedWeights[service.Name] = roundedWeight
+		totalRoundedWeight += roundedWeight
 	}
+
+	// Calculate the rounding error
+	roundingError := 100 - totalRoundedWeight
+
+	// Second pass: distribute the rounding error
+	for _, service := range db.ServicesMap {
+		if roundingError == 0 {
+			break
+		}
+		if roundedWeights[service.Name] > 0 {
+			roundedWeights[service.Name]++
+			roundingError--
+		}
+	}
+
+	// Update the service weights with the normalized values
+	for _, service := range db.ServicesMap {
+		service.CurrWeight = roundedWeights[service.Name]
+	}
+
+	// Log the final weights to verify correctness
+	totalWeight = 0
+	for _, service := range db.ServicesMap {
+		totalWeight += service.CurrWeight
+		log.Printf("📈 Normalized weight for %s: %d", service.Name, service.CurrWeight)
+	}
+	log.Printf("📊 Total normalized weight: %d", totalWeight)
 }
