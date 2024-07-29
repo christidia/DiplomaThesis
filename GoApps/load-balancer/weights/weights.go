@@ -39,6 +39,12 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 
 	for _, service := range db.ServicesMap {
 		service.CurrWeight = int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
+	}
+
+	normalizeWeights()
+
+	// Save normalized weights to Redis
+	for _, service := range db.ServicesMap {
 		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
 		if err != nil {
 			log.Printf("❌ Error updating curr_weight for service %s in Redis: %v", service.Name, err)
@@ -73,9 +79,10 @@ func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 			}
 
 			// Update the Prometheus metric
-			metrics.UpdateMetric(service.Name, float64(service.EmptyQWeight))
 			db.EmptyQWeights[service.Name] = float64(service.EmptyQWeight)
-			metrics.CalculateGamma()
+			metrics.UpdateGamma()
+
+			// queue has emptied for the first time
 			db.PrevQueueEmpty = true
 		}
 
@@ -89,4 +96,22 @@ func UpdateEmptyQWeightRoutine() {
 	rdb := db.NewRedisClient()
 	currentTime := time.Now()
 	createEmptyQueueEvent(rdb, currentTime)
+}
+
+// Normalize the weights so that they sum up to 100
+func normalizeWeights() {
+	totalWeight := 0
+	for _, service := range db.ServicesMap {
+		totalWeight += service.CurrWeight
+	}
+
+	if totalWeight == 0 {
+		log.Println("❌ Error: Total weight is zero. Cannot normalize.")
+		return
+	}
+
+	normalizationFactor := 100.0 / float64(totalWeight)
+	for _, service := range db.ServicesMap {
+		service.CurrWeight = int(float64(service.CurrWeight) * normalizationFactor)
+	}
 }

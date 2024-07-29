@@ -14,12 +14,8 @@ import (
 type AIMDRoutingAlgorithm struct{}
 
 func (a *AIMDRoutingAlgorithm) RouteEvent(event cloudevents.Event, servicesMap map[string]*rdb.Service) {
-	totalRate := 0
-	for _, service := range servicesMap {
-		totalRate += service.CurrWeight
-	}
-
-	randomValue := localRand.Intn(totalRate)
+	// Generate a random value between 0 and 100
+	randomValue := localRand.Intn(100)
 
 	cumulativeRate := 0
 	var destination *rdb.Service
