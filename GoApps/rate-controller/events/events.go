@@ -44,12 +44,20 @@ func HandleRequestEvent(event cloudevents.Event) {
 		return
 	}
 
+	// Wait for the rate limiter to allow the event to be processed
+	err := rateController.limiter.Wait(context.Background())
+	if err != nil {
+		log.Printf("⚠️ Error waiting for rate limiter: %v", err)
+		return
+	}
+
 	admissionRate := rateController.GetAdmissionRate()
 	metrics.UpdateMetric(admissionRate)
 	log.Printf("Handled request event with data: %s", reqEvent.RequestData)
 
 	// Process the request based on the current admission rate
-	// For example, you can forward the request to another service or process it locally
+	// Forward the request to another service or process it locally
+	log.Printf("Processed request event with data: %s", reqEvent.RequestData)
 }
 
 func StartReceiver() {

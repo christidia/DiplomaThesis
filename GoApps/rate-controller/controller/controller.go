@@ -3,6 +3,8 @@ package controller
 import (
 	"sync"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 type RateController struct {
@@ -11,14 +13,17 @@ type RateController struct {
 	lastEmptyQueueTime time.Time
 	alpha              float64
 	beta               float64
+	limiter            *rate.Limiter
 }
 
 func NewRateController(alpha, beta float64) *RateController {
+	initialRate := 1.0 // Initialize with a default admission rate
 	return &RateController{
-		admissionRate:      1.0, // Initialize with a default admission rate
+		admissionRate:      initialRate,
 		lastEmptyQueueTime: time.Now(),
 		alpha:              alpha,
 		beta:               beta,
+		limiter:            rate.NewLimiter(rate.Limit(initialRate), 1), // Create a rate limiter
 	}
 }
 
@@ -41,4 +46,7 @@ func (rc *RateController) UpdateAdmissionRate(queueEmpty bool) {
 	} else {
 		rc.admissionRate = rc.beta*rc.admissionRate + rc.alpha*elapsedTime
 	}
+
+	// Update the rate limiter with the new admission rate
+	rc.limiter.SetLimit(rate.Limit(rc.admissionRate))
 }

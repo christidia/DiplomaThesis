@@ -14,7 +14,7 @@ func main() {
 
 	alpha, err := strconv.ParseFloat(os.Getenv("ALPHA"), 64)
 	if err != nil {
-		alpha = 0.1
+		alpha = 3
 	}
 
 	beta, err := strconv.ParseFloat(os.Getenv("BETA"), 64)
