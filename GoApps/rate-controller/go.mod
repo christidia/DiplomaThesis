@@ -1,10 +1,11 @@
 module rate-controller
 
-go 1.22.4
+go 1.22
 
 require (
 	github.com/cloudevents/sdk-go/v2 v2.15.2
 	github.com/prometheus/client_golang v1.19.1
+	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 )
 
 require (
