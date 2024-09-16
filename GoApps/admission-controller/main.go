@@ -12,7 +12,7 @@ func main() {
 	config.LoadConfig()
 
 	// Initialize Rate Controller
-	events.InitRateController(config.Alpha, config.Alpha)
+	events.InitRateController(config.Alpha, config.Beta)
 
 	// Start the metrics server
 	go metrics.StartMetricsServer()

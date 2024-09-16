@@ -23,6 +23,9 @@ func SubscribeToAdmissionRate(rdb *redis.Client) {
 	serviceName := config.ServiceName
 	pubSub := rdb.Subscribe(context.Background(), "admission_rate:"+serviceName)
 
+	// Defer closing pubSub to ensure graceful shutdown
+	defer pubSub.Close()
+
 	// Listen for admission rate updates
 	ch := pubSub.Channel()
 	for msg := range ch {
@@ -55,8 +58,8 @@ func StartReceiver() {
 	// Initialize Redis client
 	rdbClient = redis.NewClient(&redis.Options{
 		Addr:     config.RedisURL,
-		Password: config.RedisPass, // no password set
-		DB:       0,                // use default DB
+		Password: config.RedisPass,
+		DB:       0, // use default DB
 	})
 
 	// Subscribe to admission rate changes for the specific service
