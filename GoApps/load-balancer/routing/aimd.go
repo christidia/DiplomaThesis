@@ -14,6 +14,10 @@ import (
 type AIMDRoutingAlgorithm struct{}
 
 func (a *AIMDRoutingAlgorithm) RouteEvent(event cloudevents.Event, servicesMap map[string]*rdb.Service) {
+
+	// Set the event type
+	event.SetType("com.example.request")
+
 	// Generate a random value between 0 and 100
 	randomValue := localRand.Intn(100)
 
