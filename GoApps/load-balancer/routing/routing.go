@@ -2,7 +2,6 @@ package routing
 
 import (
 	"log"
-	"math/rand"
 	"time"
 
 	"load-balancer/config"
@@ -15,7 +14,7 @@ import (
 
 var (
 	SelectedAlgorithm RoutingAlgorithm
-	localRand         = rand.New(rand.NewSource(time.Now().UnixNano()))
+	//localRand         = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
 type RoutingAlgorithm interface {
