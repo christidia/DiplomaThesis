@@ -41,11 +41,16 @@ func (a *AIMDRoutingAlgorithm) RouteEvent(event cloudevents.Event, servicesMap m
 	prefixSums := generatePrefixSums(servicesMap)
 	totalWeight := prefixSums[len(prefixSums)-1]
 
+	// Log the prefix sums and total weight
+	log.Printf("🧮 Prefix sums: %v, Total weight: %d", prefixSums, totalWeight)
+
 	// Generate a random value between 0 and the total sum of weights
 	randomValue := rand.Intn(totalWeight)
+	log.Printf("🎲 Generated random value: %d", randomValue)
 
 	// Use binary search to find the selected service index
 	selectedIndex := binarySearch(prefixSums, randomValue)
+	log.Printf("🎯 Selected service index: %d", selectedIndex)
 
 	// Retrieve the selected service based on the index
 	var destination *rdb.Service
