@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	maxAdmissionRate = config.MaxAdmissionRate
+	maxAdmissionRate = 100
 	minAdmissionRate = config.MinAdmissionRate
 )
 
