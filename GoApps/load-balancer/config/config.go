@@ -97,13 +97,13 @@ func LoadConfig() {
 	if minRateStr != "" {
 		minRate, err := strconv.Atoi(minRateStr)
 		if err != nil {
-			log.Printf("⚠️ Invalid MIN_ADMISSION_RATE value: %v. Using default: 20", err)
-			MinAdmissionRate = 20
+			log.Printf("⚠️ Invalid MIN_ADMISSION_RATE value: %v. Using default: 1", err)
+			MinAdmissionRate = 1
 		} else {
 			MinAdmissionRate = minRate
 		}
 	} else {
-		MinAdmissionRate = 20
+		MinAdmissionRate = 1
 	}
 
 	log.Printf("📋 Admission Rate Config: min=%d, max=%d", MinAdmissionRate, MaxAdmissionRate)
