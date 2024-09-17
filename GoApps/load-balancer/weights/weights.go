@@ -17,17 +17,13 @@ var (
 )
 
 func InitializeTkIfNotExists(rdb *redis.Client) error {
-	exists, err := db.KeyExists(rdb, db.TkKey)
+	// Always initialize tk to the current time minus 0.1 seconds
+	tk := time.Now().Add(-100 * time.Millisecond).Unix() // Initialize 'tk' to the current timestamp minus 0.1 seconds
+	err := rdb.Set(db.Ctx, db.TkKey, tk, 0).Err()
 	if err != nil {
 		return err
 	}
-	if !exists {
-		tk := time.Now().Add(-time.Minute).Unix() // Initialize 'tk' to the current timestamp minus an offset
-		err := rdb.Set(db.Ctx, db.TkKey, tk, 0).Err()
-		if err != nil {
-			return err
-		}
-	}
+	log.Printf("🗓️ tk initialized or updated with timestamp: %d", tk)
 	return nil
 }
 
@@ -48,16 +44,15 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 
 	for _, service := range db.ServicesMap {
 		// Apply AIMD on the raw admission rate with `EmptyQWeight` as the baseline
-		service.RawAdmissionRate = int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
+		rawRate := int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
 		// Ensure the admission rate is within the logical bounds
-		// if rawRate > maxAdmissionRate {
-		// 	rawRate = maxAdmissionRate
-		// }
-		// else if rawRate < minAdmissionRate {
-		// 	rawRate = minAdmissionRate
-		// }
+		if rawRate > maxAdmissionRate {
+			rawRate = maxAdmissionRate
+		} else if rawRate < minAdmissionRate {
+			rawRate = minAdmissionRate
+		}
 
-		//service.RawAdmissionRate = rawRate
+		service.RawAdmissionRate = rawRate
 		admissionRates[service.Name] = service.RawAdmissionRate
 
 		// Save the raw admission rate in Redis for the respective service

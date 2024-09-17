@@ -45,10 +45,11 @@ func NewRedisClient() *redis.Client {
 func SaveServiceToRedis(rdb *redis.Client, service *Service) error {
 	key := ServiceKeyPrefix + service.Name
 	err := rdb.HSet(Ctx, key, map[string]interface{}{
-		"curr_weight":   service.CurrWeight,
-		"emptyq_weight": service.EmptyQWeight,
-		"beta":          service.Beta,
-		"alpha":         service.Alpha,
+		"raw_admission_rate": service.RawAdmissionRate,
+		"curr_weight":        service.CurrWeight,
+		"emptyq_weight":      service.EmptyQWeight,
+		"beta":               service.Beta,
+		"alpha":              service.Alpha,
 	}).Err()
 	return err
 }
