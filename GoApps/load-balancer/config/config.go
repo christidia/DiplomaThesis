@@ -19,6 +19,8 @@ var (
 	AdmissionRateInterval time.Duration
 	NumServices           int
 	RoutingAlgorithm      string
+	MaxAdmissionRate      int
+	MinAdmissionRate      int
 )
 
 func LoadConfig() {
@@ -76,4 +78,33 @@ func LoadConfig() {
 		log.Println("⚠️ ROUTING_ALGORITHM environment variable is not set. Using default: AIMD")
 		RoutingAlgorithm = "AIMD"
 	}
+
+	// Load the max and min admission rate from environment variables
+	maxRateStr := os.Getenv("MAX_ADMISSION_RATE")
+	if maxRateStr != "" {
+		maxRate, err := strconv.Atoi(maxRateStr)
+		if err != nil {
+			log.Printf("⚠️ Invalid MAX_ADMISSION_RATE value: %v. Using default: 100", err)
+			MaxAdmissionRate = 100
+		} else {
+			MaxAdmissionRate = maxRate
+		}
+	} else {
+		MaxAdmissionRate = 100
+	}
+
+	minRateStr := os.Getenv("MIN_ADMISSION_RATE")
+	if minRateStr != "" {
+		minRate, err := strconv.Atoi(minRateStr)
+		if err != nil {
+			log.Printf("⚠️ Invalid MIN_ADMISSION_RATE value: %v. Using default: 20", err)
+			MinAdmissionRate = 20
+		} else {
+			MinAdmissionRate = minRate
+		}
+	} else {
+		MinAdmissionRate = 20
+	}
+
+	log.Printf("📋 Admission Rate Config: min=%d, max=%d", MinAdmissionRate, MaxAdmissionRate)
 }

@@ -4,10 +4,16 @@ import (
 	"log"
 	"time"
 
+	"load-balancer/config"
 	"load-balancer/db"
 	"load-balancer/metrics"
 
 	"github.com/go-redis/redis/v8"
+)
+
+var (
+	maxAdmissionRate = config.MaxAdmissionRate
+	minAdmissionRate = config.MinAdmissionRate
 )
 
 func InitializeTkIfNotExists(rdb *redis.Client) error {
@@ -42,7 +48,15 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 
 	for _, service := range db.ServicesMap {
 		// Apply AIMD on the raw admission rate with `EmptyQWeight` as the baseline
-		service.RawAdmissionRate = int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
+		rawRate := int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
+		// Ensure the admission rate is within the logical bounds
+		if rawRate > maxAdmissionRate {
+			rawRate = maxAdmissionRate
+		} else if rawRate < minAdmissionRate {
+			rawRate = minAdmissionRate
+		}
+
+		service.RawAdmissionRate = rawRate
 		admissionRates[service.Name] = service.RawAdmissionRate
 
 		// Save the raw admission rate in Redis for the respective service
