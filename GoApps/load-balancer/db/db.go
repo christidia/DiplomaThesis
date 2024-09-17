@@ -69,8 +69,8 @@ func InitializeServices(rdb *redis.Client) {
 		service := &Service{
 			Name:             name,
 			CurrWeight:       10 * (i + 1), // Initial CurrWeight (used for routing, will be normalized)
-			EmptyQWeight:     1 + i,        // Initial EmptyQWeight (baseline for AIMD)
-			RawAdmissionRate: 1 + i,        // Smaller Initial Admission Rate (e.g., 1-10)
+			EmptyQWeight:     10 + i,       // Initial EmptyQWeight (baseline for AIMD)
+			RawAdmissionRate: 10 + i,       // Smaller Initial Admission Rate (e.g., 1-10)
 			Beta:             0.5,          // AIMD multiplicative decrease factor
 			Alpha:            3 + i,        // AIMD additive increase factor
 		}
