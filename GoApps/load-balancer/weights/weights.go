@@ -52,8 +52,6 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 		// Ensure the admission rate is within the logical bounds
 		if rawRate > maxAdmissionRate {
 			rawRate = maxAdmissionRate
-		} else if rawRate < minAdmissionRate {
-			rawRate = minAdmissionRate
 		}
 
 		service.RawAdmissionRate = rawRate
