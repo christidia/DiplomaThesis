@@ -17,11 +17,12 @@ var (
 )
 
 type Service struct {
-	Name         string
-	CurrWeight   int
-	EmptyQWeight int
-	Beta         float64
-	Alpha        int
+	Name             string
+	RawAdmissionRate int // Raw value used for AIMD and admission controllers
+	CurrWeight       int // Normalized value used for routing
+	EmptyQWeight     int // Baseline value for raw admission rate when queue is empty
+	Beta             float64
+	Alpha            int
 }
 
 var (
@@ -65,11 +66,12 @@ func InitializeServices(rdb *redis.Client) {
 	for i := 0; i < config.NumServices; i++ {
 		name := fmt.Sprintf("service%d", i+1)
 		service := &Service{
-			Name:         name,
-			CurrWeight:   10 * (i + 1),
-			EmptyQWeight: 10 * (i + 1),
-			Beta:         0.5,
-			Alpha:        3 + i,
+			Name:             name,
+			CurrWeight:       10 * (i + 1), // Initial CurrWeight (used for routing, will be normalized)
+			EmptyQWeight:     10 * (i + 1), // Initial EmptyQWeight (baseline for AIMD)
+			RawAdmissionRate: 1 + i,        // Smaller Initial Admission Rate (e.g., 1-10)
+			Beta:             0.5,          // AIMD multiplicative decrease factor
+			Alpha:            3 + i,        // AIMD additive increase factor
 		}
 		ServicesMap[service.Name] = service
 		if err := SaveServiceToRedis(rdb, service); err != nil {

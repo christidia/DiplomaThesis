@@ -37,20 +37,28 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 
 	elapsedTime := currentTime.Sub(time.Unix(tk, 0)).Seconds()
 
-	for _, service := range db.ServicesMap {
-		service.CurrWeight = int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
-	}
+	// Store the raw admission rates before normalizing for routing
+	admissionRates := make(map[string]int)
 
-	normalizeWeights()
-
-	// Save normalized weights to Redis
 	for _, service := range db.ServicesMap {
-		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
+		// Apply AIMD on the raw admission rate with `EmptyQWeight` as the baseline
+		service.RawAdmissionRate = int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
+		admissionRates[service.Name] = service.RawAdmissionRate
+
+		// Save the raw admission rate in Redis for the respective service
+		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "raw_admission_rate", service.RawAdmissionRate).Err()
 		if err != nil {
-			log.Printf("❌ Error updating curr_weight for service %s in Redis: %v", service.Name, err)
+			log.Printf("❌ Error updating raw_admission_rate for service %s in Redis: %v", service.Name, err)
+		} else {
+			log.Printf("📥 Updated raw admission rate for %s: %d", service.Name, service.RawAdmissionRate)
 		}
-		log.Printf("📈 Updated admission rate for %s: %d", service.Name, service.CurrWeight)
 	}
+
+	// Publish raw admission rates for admission controllers
+	publishAdmissionRates(rdb)
+
+	// Normalize the raw admission rates for routing
+	normalizeWeights(rdb)
 }
 
 func updateTkInRedis(rdb *redis.Client, currentTime time.Time) {
@@ -72,7 +80,7 @@ func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 		defer db.AdmissionRatesMutex.Unlock()
 
 		for _, service := range db.ServicesMap {
-			service.EmptyQWeight = service.CurrWeight
+			service.EmptyQWeight = service.RawAdmissionRate
 			err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "emptyq_weight", service.EmptyQWeight).Err()
 			if err != nil {
 				log.Printf("❌ Error updating emptyq_weight for service %s in Redis: %v", service.Name, err)
@@ -98,11 +106,25 @@ func UpdateEmptyQWeightRoutine() {
 	createEmptyQueueEvent(rdb, currentTime)
 }
 
-// Normalize the weights so that they sum up to 100
-func normalizeWeights() {
+// Publish individual admission rates to Redis after normalizing them.
+func publishAdmissionRates(rdb *redis.Client) {
+	for _, service := range db.ServicesMap {
+		admissionRate := float64(service.RawAdmissionRate)
+		channel := "admission_rate:" + service.Name
+		err := rdb.Publish(db.Ctx, channel, admissionRate).Err()
+		if err != nil {
+			log.Printf("❌ Error publishing admission rate for service %s: %v", service.Name, err)
+		} else {
+			log.Printf("📡 Published admission rate for %s: %f", service.Name, admissionRate)
+		}
+	}
+}
+
+// Normalize the raw admission rates so that they sum up to 100
+func normalizeWeights(rdb *redis.Client) {
 	totalWeight := 0
 	for _, service := range db.ServicesMap {
-		totalWeight += service.CurrWeight
+		totalWeight += service.RawAdmissionRate
 	}
 
 	if totalWeight == 0 {
@@ -116,7 +138,7 @@ func normalizeWeights() {
 
 	// First pass: normalize and round weights
 	for _, service := range db.ServicesMap {
-		normalizedWeight := float64(service.CurrWeight) * normalizationFactor
+		normalizedWeight := float64(service.RawAdmissionRate) * normalizationFactor
 		roundedWeight := int(normalizedWeight)
 		roundedWeights[service.Name] = roundedWeight
 		totalRoundedWeight += roundedWeight
@@ -139,6 +161,14 @@ func normalizeWeights() {
 	// Update the service weights with the normalized values
 	for _, service := range db.ServicesMap {
 		service.CurrWeight = roundedWeights[service.Name]
+
+		// Save the normalized CurrWeight in Redis for the respective service
+		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
+		if err != nil {
+			log.Printf("❌ Error updating curr_weight for service %s in Redis: %v", service.Name, err)
+		} else {
+			log.Printf("📥 Updated curr_weight for %s: %d", service.Name, service.CurrWeight)
+		}
 	}
 
 	// Log the final weights to verify correctness
