@@ -48,16 +48,16 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 
 	for _, service := range db.ServicesMap {
 		// Apply AIMD on the raw admission rate with `EmptyQWeight` as the baseline
-		rawRate := int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
+		service.RawAdmissionRate = int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
 		// Ensure the admission rate is within the logical bounds
-		if rawRate > maxAdmissionRate {
-			rawRate = maxAdmissionRate
-		}
+		// if rawRate > maxAdmissionRate {
+		// 	rawRate = maxAdmissionRate
+		// }
 		// else if rawRate < minAdmissionRate {
 		// 	rawRate = minAdmissionRate
 		// }
 
-		service.RawAdmissionRate = rawRate
+		//service.RawAdmissionRate = rawRate
 		admissionRates[service.Name] = service.RawAdmissionRate
 
 		// Save the raw admission rate in Redis for the respective service
