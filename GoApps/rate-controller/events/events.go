@@ -3,80 +3,62 @@ package events
 import (
 	"context"
 	"log"
+	"strconv"
 
-	"rate-controller/controller"
-	"rate-controller/metrics"
+	"admission-controller/config"
+	"admission-controller/controller"
+	"admission-controller/metrics"
 
-	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"github.com/go-redis/redis/v8"
 )
 
 var (
 	rateController *controller.RateController
+	rdbClient      *redis.Client
 )
 
-type EmptyQueueEvent struct {
-	ServiceName string `json:"serviceName"`
+// Subscribe to the Redis channel for admission rate updates for the specific service.
+func SubscribeToAdmissionRate(rdb *redis.Client) {
+	serviceName := config.ServiceName
+	pubSub := rdb.Subscribe(context.Background(), "admission_rate:"+serviceName)
+
+	// Defer closing pubSub to ensure graceful shutdown
+	defer pubSub.Close()
+
+	// Listen for admission rate updates
+	ch := pubSub.Channel()
+	for msg := range ch {
+		admissionRateStr := msg.Payload
+		admissionRate, err := strconv.ParseFloat(admissionRateStr, 64)
+		if err != nil {
+			log.Printf("⚠️ Error parsing admission rate: %v", err)
+			continue
+		}
+
+		log.Printf("🚀 Received new admission rate for %s: %f", serviceName, admissionRate)
+
+		// Update the rate controller
+		rateController.UpdateAdmissionRateFromRedis(admissionRate)
+
+		// Update the Prometheus metric with the new admission rate
+		metrics.UpdateMetric(admissionRate)
+		log.Printf("✅ Updated admission rate for %s to %f", serviceName, admissionRate)
+	}
 }
 
-type RequestEvent struct {
-	RequestData string `json:"requestData"`
-}
-
+// Initialize the rate controller
 func InitRateController(alpha, beta float64) {
 	rateController = controller.NewRateController(alpha, beta)
 }
 
-func HandleEmptyQueueEvent(event cloudevents.Event) {
-	var eqEvent EmptyQueueEvent
-	if err := event.DataAs(&eqEvent); err != nil {
-		log.Printf("⚠️ Error parsing EmptyQueueEvent data: %v", err)
-		return
-	}
-
-	rateController.UpdateAdmissionRate(true)
-	log.Printf("Handled empty queue event for service: %s", eqEvent.ServiceName)
-}
-
-func HandleRequestEvent(event cloudevents.Event) {
-	var reqEvent RequestEvent
-	if err := event.DataAs(&reqEvent); err != nil {
-		log.Printf("⚠️ Error parsing RequestEvent data: %v", err)
-		return
-	}
-
-	// Wait for the rate limiter to allow the event to be processed
-	err := rateController.limiter.Wait(context.Background())
-	if err != nil {
-		log.Printf("⚠️ Error waiting for rate limiter: %v", err)
-		return
-	}
-
-	admissionRate := rateController.GetAdmissionRate()
-	metrics.UpdateMetric(admissionRate)
-	log.Printf("Handled request event with data: %s", reqEvent.RequestData)
-
-	// Process the request based on the current admission rate
-	// Forward the request to another service or process it locally
-	log.Printf("Processed request event with data: %s", reqEvent.RequestData)
-}
-
+// StartReceiver subscribes to the Redis channel for the specific service's admission rate.
 func StartReceiver() {
-	c, err := cloudevents.NewClientHTTP()
-	if err != nil {
-		log.Fatalf("❌ Failed to create CloudEvents client: %v", err)
-	}
-
-	err = c.StartReceiver(context.Background(), func(ctx context.Context, event cloudevents.Event) {
-		switch event.Type() {
-		case "com.example.emptyqueue":
-			HandleEmptyQueueEvent(event)
-		case "com.example.request":
-			HandleRequestEvent(event)
-		default:
-			log.Printf("Received unsupported event type: %s", event.Type())
-		}
+	rdbClient = redis.NewClient(&redis.Options{
+		Addr:     config.RedisURL,
+		Password: config.RedisPass, // No password set
+		DB:       0,                // Use default DB
 	})
-	if err != nil {
-		log.Fatalf("❌ Failed to start receiver: %v", err)
-	}
+
+	// Subscribe to admission rate updates for the specific service
+	SubscribeToAdmissionRate(rdbClient)
 }

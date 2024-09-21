@@ -12,18 +12,13 @@ var (
 	ServiceName    string
 	Alpha          float64
 	Beta           float64
+
+	RedisURL  string
+	RedisPass string
 )
 
 func LoadConfig() {
-	updateIntervalStr := os.Getenv("UPDATE_INTERVAL")
-	if updateIntervalStr == "" {
-		log.Fatal("❌ UPDATE_INTERVAL environment variable is not set")
-	}
-	updateInterval, err := strconv.Atoi(updateIntervalStr)
-	if err != nil {
-		log.Fatalf("❌ Invalid UPDATE_INTERVAL value: %v", err)
-	}
-	UpdateInterval = time.Duration(updateInterval) * time.Second
+	var err error // Declare 'err' here
 
 	ServiceName = os.Getenv("SERVICE_NAME")
 	if ServiceName == "" {
@@ -48,5 +43,14 @@ func LoadConfig() {
 		if err != nil {
 			log.Fatalf("❌ Invalid BETA value: %v", err)
 		}
+	}
+
+	RedisURL = os.Getenv("REDIS_URL")
+	if RedisURL == "" {
+		log.Fatal("❌ REDIS_URL environment variable is not set")
+	}
+	RedisPass = os.Getenv("REDIS_PASSWORD")
+	if RedisPass == "" {
+		log.Fatal("❌ REDIS_PASSWORD environment variable is not set")
 	}
 }
