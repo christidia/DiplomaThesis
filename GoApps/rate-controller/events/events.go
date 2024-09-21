@@ -5,9 +5,9 @@ import (
 	"log"
 	"strconv"
 
-	"admission-controller/config"
-	"admission-controller/controller"
-	"admission-controller/metrics"
+	"rate-controller/config"
+	"rate-controller/controller"
+	"rate-controller/metrics"
 
 	"github.com/go-redis/redis/v8"
 )
