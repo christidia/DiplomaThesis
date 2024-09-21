@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"sync"
 
-	"admission-controller/config"
+	"rate-controller/config"
 
 	"golang.org/x/time/rate"
 )
