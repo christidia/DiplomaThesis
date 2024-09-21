@@ -12,17 +12,23 @@ var (
 	ServiceName    string
 	Alpha          float64
 	Beta           float64
+	ServiceURL     string // URL for the consuming service
 
 	RedisURL  string
 	RedisPass string
 )
 
 func LoadConfig() {
-	var err error // Declare 'err' here
+	var err error
 
 	ServiceName = os.Getenv("SERVICE_NAME")
 	if ServiceName == "" {
 		log.Fatal("❌ SERVICE_NAME environment variable is not set")
+	}
+
+	ServiceURL = os.Getenv("SERVICE_URL")
+	if ServiceURL == "" {
+		log.Fatal("❌ SERVICE_URL environment variable is not set")
 	}
 
 	alphaStr := os.Getenv("ALPHA")

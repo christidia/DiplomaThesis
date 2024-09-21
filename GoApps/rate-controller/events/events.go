@@ -3,11 +3,11 @@ package events
 import (
 	"context"
 	"log"
-	"strconv"
-
 	"rate-controller/config"
 	"rate-controller/controller"
 	"rate-controller/metrics"
+	"strconv"
+	"sync"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -15,6 +15,8 @@ import (
 var (
 	rateController *controller.RateController
 	rdbClient      *redis.Client
+	requestBuffer  = make(chan []byte, 100) // Buffer for storing incoming requests
+	wg             sync.WaitGroup
 )
 
 // Subscribe to the Redis channel for admission rate updates for the specific service.
@@ -37,7 +39,7 @@ func SubscribeToAdmissionRate(rdb *redis.Client) {
 
 		log.Printf("🚀 Received new admission rate for %s: %f", serviceName, admissionRate)
 
-		// Update the rate controller
+		// Update the rate controller's limiter with the new admission rate
 		rateController.UpdateAdmissionRateFromRedis(admissionRate)
 
 		// Update the Prometheus metric with the new admission rate
@@ -46,12 +48,24 @@ func SubscribeToAdmissionRate(rdb *redis.Client) {
 	}
 }
 
+// ProcessBufferedRequests listens for requests in the buffer and forwards them at the rate defined by the controller
+func ProcessBufferedRequests() {
+	for requestBody := range requestBuffer {
+		rateController.ForwardRequest(requestBody) // Forward each request at the rate limit
+	}
+}
+
+// AddRequestToBuffer adds an incoming request to the buffer for processing
+func AddRequestToBuffer(requestBody []byte) {
+	requestBuffer <- requestBody
+}
+
 // Initialize the rate controller
 func InitRateController(alpha, beta float64) {
 	rateController = controller.NewRateController(alpha, beta)
 }
 
-// StartReceiver subscribes to the Redis channel for the specific service's admission rate.
+// StartReceiver subscribes to the Redis channel for the specific service's admission rate and starts processing requests.
 func StartReceiver() {
 	rdbClient = redis.NewClient(&redis.Options{
 		Addr:     config.RedisURL,
@@ -60,5 +74,8 @@ func StartReceiver() {
 	})
 
 	// Subscribe to admission rate updates for the specific service
-	SubscribeToAdmissionRate(rdbClient)
+	go SubscribeToAdmissionRate(rdbClient)
+
+	// Start processing buffered requests
+	go ProcessBufferedRequests()
 }

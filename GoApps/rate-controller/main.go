@@ -28,6 +28,6 @@ func main() {
 	// Start the metrics server
 	go metrics.StartMetricsServer()
 
-	// Start the event receiver
+	// Start the event receiver and request processor
 	events.StartReceiver()
 }
