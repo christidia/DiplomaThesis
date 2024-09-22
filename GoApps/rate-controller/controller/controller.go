@@ -48,15 +48,17 @@ func (rc *RateController) ForwardRequest(requestBody []byte) {
 
 	log.Printf("⏩ Forwarding request to %s as CloudEvent", config.ServiceURL)
 
-	// Encode the image data (assuming it's in the request body) in base64
-	encodedImageData := base64.StdEncoding.EncodeToString(requestBody)
+	// Encode the request data (assuming it's image data or some payload) in base64
+	encodedData := base64.StdEncoding.EncodeToString(requestBody)
 
 	// Create a CloudEvent with the expected data structure
 	event := cloudevents.NewEvent()
-	event.SetSource("rate-controller")
-	event.SetType("com.example.ratecontroller.image")
+	event.SetSource("admission-controller")     // Adjust source to match your system
+	event.SetType("com.example.admission.rate") // Set appropriate event type for your case
+
+	// Set the event data. Assuming the consuming service expects "imageData" or other structured data
 	event.SetData(cloudevents.ApplicationJSON, map[string]string{
-		"imageData": encodedImageData,
+		"imageData": encodedData, // or other data as required
 	})
 
 	// Set CloudEvent headers and target URL
