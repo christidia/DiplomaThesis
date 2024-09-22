@@ -17,6 +17,7 @@ type RateController struct {
 	admissionRate float64
 	Limiter       *rate.Limiter
 	Client        cloudevents.Client // CloudEvents client to send requests
+	RequestQueue  chan []byte        // Channel to buffer incoming requests
 }
 
 // NewRateController initializes a new RateController with the given alpha and beta values
@@ -30,22 +31,45 @@ func NewRateController(alpha, beta float64) *RateController {
 		log.Fatalf("❌ Failed to create CloudEvents client: %v", err)
 	}
 
-	return &RateController{
+	// Initialize the request queue (buffer) with a size of 100
+	requestQueue := make(chan []byte, 100)
+
+	// Start the process to forward requests from the queue with rate limiting
+	rc := &RateController{
 		admissionRate: initialRate,
 		Limiter:       rate.NewLimiter(rate.Limit(initialRate), 1), // Create a rate limiter
-		Client:        client,                                      // Initialize the CloudEvents client
+		Client:        client,
+		RequestQueue:  requestQueue,
+	}
+
+	// Start the goroutine to forward requests from the buffer
+	go rc.startForwarding()
+
+	return rc
+}
+
+// ForwardRequestToBuffer adds incoming requests to the buffer without rate limiting
+func (rc *RateController) ForwardRequestToBuffer(requestBody []byte) {
+	log.Println("📥 Request added to buffer")
+	rc.RequestQueue <- requestBody // Add the request to the buffer
+}
+
+// startForwarding is a goroutine that reads from the request buffer and forwards requests to the service at a rate-limited pace
+func (rc *RateController) startForwarding() {
+	for requestBody := range rc.RequestQueue {
+		// Wait until allowed by the rate limiter
+		err := rc.Limiter.Wait(context.Background())
+		if err != nil {
+			log.Printf("⚠️ Error waiting on rate limiter: %v", err)
+			continue
+		}
+		// Forward the request to the consuming service
+		rc.forwardRequest(requestBody)
 	}
 }
 
-// ForwardRequest forwards the buffered request to the service URL as a CloudEvent based on the current admission rate
-func (rc *RateController) ForwardRequest(requestBody []byte) {
-	// Wait until allowed by the rate limiter
-	err := rc.Limiter.Wait(context.Background())
-	if err != nil {
-		log.Printf("⚠️ Error waiting on rate limiter: %v", err)
-		return
-	}
-
+// forwardRequest forwards a single request to the consuming service as a CloudEvent
+func (rc *RateController) forwardRequest(requestBody []byte) {
 	log.Printf("⏩ Forwarding request to %s as CloudEvent", config.ServiceURL)
 
 	// Encode the request data (assuming it's image data or some payload) in base64
