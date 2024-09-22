@@ -1,14 +1,14 @@
 package events
 
 import (
-	"bytes"
 	"context"
 	"log"
 	"net/http"
+	"strconv"
+
 	"rate-controller/config"
 	"rate-controller/controller"
 	"rate-controller/metrics"
-	"strconv"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/go-redis/redis/v8"
@@ -50,8 +50,9 @@ func SubscribeToAdmissionRate(rdb *redis.Client) {
 
 // HandleEvent processes incoming CloudEvents and forwards them to the consuming service with rate-limiting applied.
 func HandleEvent(ctx context.Context, event cloudevents.Event) cloudevents.Result {
-	// Apply the rate limit when receiving the event
-	if err := rateController.Limiter.Wait(ctx); err != nil {
+	// Wait until the rate limiter allows us to process the event
+	err := rateController.Limiter.Wait(ctx)
+	if err != nil {
 		log.Printf("❌ Error applying rate limit: %v", err)
 		return cloudevents.NewHTTPResult(http.StatusTooManyRequests, "Rate limit exceeded")
 	}
@@ -62,41 +63,24 @@ func HandleEvent(ctx context.Context, event cloudevents.Event) cloudevents.Resul
 
 // forwardEventToService forwards the CloudEvent to the configured service URL.
 func forwardEventToService(ctx context.Context, event cloudevents.Event) cloudevents.Result {
-	// Convert the CloudEvent to a byte array
-	eventBytes, err := event.MarshalJSON()
+	// Use CloudEvents client to handle the forwarding instead of manually creating the HTTP request
+	client, err := cloudevents.NewClientHTTP()
 	if err != nil {
-		log.Printf("❌ Error marshalling CloudEvent: %v", err)
-		return cloudevents.NewHTTPResult(http.StatusInternalServerError, "Error marshalling CloudEvent")
+		log.Printf("❌ Error creating CloudEvents client: %v", err)
+		return cloudevents.NewHTTPResult(http.StatusInternalServerError, "Error creating CloudEvents client")
 	}
 
-	// Create an HTTP POST request with the CloudEvent data
-	req, err := http.NewRequestWithContext(ctx, "POST", config.ServiceURL, bytes.NewBuffer(eventBytes))
-	if err != nil {
-		log.Printf("❌ Error creating HTTP request: %v", err)
-		return cloudevents.NewHTTPResult(http.StatusInternalServerError, "Error creating HTTP request")
-	}
+	// Forward the event
+	ctx = cloudevents.ContextWithTarget(ctx, config.ServiceURL)
+	result := client.Send(ctx, event)
 
-	// Set the appropriate headers for the CloudEvent
-	req.Header.Set("Content-Type", cloudevents.ApplicationJSON) // or cloudevents.ApplicationCloudEventsJSON
-	req.Header.Set("Ce-Specversion", event.SpecVersion())
-	req.Header.Set("Ce-Id", event.ID())
-	req.Header.Set("Ce-Source", event.Source())
-	req.Header.Set("Ce-Type", event.Type())
-
-	// Forward the request to the consuming service
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		log.Printf("❌ Error forwarding CloudEvent to %s: %v", config.ServiceURL, err)
-		return cloudevents.NewHTTPResult(http.StatusInternalServerError, "Error forwarding CloudEvent")
-	}
-	defer resp.Body.Close()
-
-	log.Printf("✅ Successfully forwarded CloudEvent to %s, response code: %d", config.ServiceURL, resp.StatusCode)
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+	if cloudevents.IsACK(result) {
+		log.Printf("✅ Successfully forwarded CloudEvent to %s", config.ServiceURL)
 		return cloudevents.ResultACK
 	}
-	return cloudevents.NewHTTPResult(resp.StatusCode, "Failed to forward CloudEvent")
+
+	log.Printf("❌ Failed to forward CloudEvent to %s", config.ServiceURL)
+	return result
 }
 
 // Initialize the rate controller
