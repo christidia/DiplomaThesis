@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"encoding/base64"
 	"log"
 	"sync"
 
@@ -47,11 +48,16 @@ func (rc *RateController) ForwardRequest(requestBody []byte) {
 
 	log.Printf("⏩ Forwarding request to %s as CloudEvent", config.ServiceURL)
 
-	// Create a CloudEvent
+	// Encode the image data (assuming it's in the request body) in base64
+	encodedImageData := base64.StdEncoding.EncodeToString(requestBody)
+
+	// Create a CloudEvent with the expected data structure
 	event := cloudevents.NewEvent()
 	event.SetSource("rate-controller")
-	event.SetType("com.example.ratecontroller.request")
-	event.SetData(cloudevents.ApplicationJSON, requestBody) // Set the request data
+	event.SetType("com.example.ratecontroller.image")
+	event.SetData(cloudevents.ApplicationJSON, map[string]string{
+		"imageData": encodedImageData,
+	})
 
 	// Set CloudEvent headers and target URL
 	ctx := cloudevents.ContextWithTarget(context.Background(), config.ServiceURL)
