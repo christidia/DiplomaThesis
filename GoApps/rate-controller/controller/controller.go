@@ -1,14 +1,13 @@
 package controller
 
 import (
-	"bytes"
 	"context"
 	"log"
-	"net/http"
 	"sync"
 
 	"rate-controller/config"
 
+	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"golang.org/x/time/rate"
 )
 
@@ -16,21 +15,28 @@ type RateController struct {
 	mu            sync.Mutex
 	admissionRate float64
 	Limiter       *rate.Limiter
-	Client        *http.Client // HTTP client to send requests
+	Client        cloudevents.Client // CloudEvents client to send requests
 }
 
 // NewRateController initializes a new RateController with the given alpha and beta values
 func NewRateController(alpha, beta float64) *RateController {
 	initialRate := 1.0 // Initialize with a default admission rate
 	log.Printf("🔧 Creating RateLimiter with initial rate: %f", initialRate)
+
+	// Create a CloudEvents HTTP client
+	client, err := cloudevents.NewClientHTTP()
+	if err != nil {
+		log.Fatalf("❌ Failed to create CloudEvents client: %v", err)
+	}
+
 	return &RateController{
 		admissionRate: initialRate,
 		Limiter:       rate.NewLimiter(rate.Limit(initialRate), 1), // Create a rate limiter
-		Client:        &http.Client{},                              // Initialize the HTTP client
+		Client:        client,                                      // Initialize the CloudEvents client
 	}
 }
 
-// ForwardRequest forwards the buffered request to the service URL based on the current admission rate
+// ForwardRequest forwards the buffered request to the service URL as a CloudEvent based on the current admission rate
 func (rc *RateController) ForwardRequest(requestBody []byte) {
 	// Wait until allowed by the rate limiter
 	err := rc.Limiter.Wait(context.Background())
@@ -39,31 +45,24 @@ func (rc *RateController) ForwardRequest(requestBody []byte) {
 		return
 	}
 
-	log.Printf("⏩ Forwarding request to %s", config.ServiceURL)
+	log.Printf("⏩ Forwarding request to %s as CloudEvent", config.ServiceURL)
 
-	// Retry mechanism
-	const maxRetries = 3
-	for retries := 0; retries < maxRetries; retries++ {
-		req, err := http.NewRequest("POST", config.ServiceURL, bytes.NewBuffer(requestBody))
-		if err != nil {
-			log.Printf("❌ Error creating HTTP request: %v", err)
-			return
-		}
+	// Create a CloudEvent
+	event := cloudevents.NewEvent()
+	event.SetSource("rate-controller")
+	event.SetType("com.example.ratecontroller.request")
+	event.SetData(cloudevents.ApplicationJSON, requestBody) // Set the request data
 
-		resp, err := rc.Client.Do(req)
-		if err != nil {
-			log.Printf("❌ Error forwarding request to %s: %v (attempt %d/%d)", config.ServiceURL, err, retries+1, maxRetries)
-			continue
-		}
-		defer resp.Body.Close()
+	// Set CloudEvent headers and target URL
+	ctx := cloudevents.ContextWithTarget(context.Background(), config.ServiceURL)
 
-		if resp.StatusCode == http.StatusOK {
-			log.Printf("✅ Successfully forwarded request to %s, response code: %d", config.ServiceURL, resp.StatusCode)
-			return
-		}
-		log.Printf("⚠️ Request to %s failed with response code: %d (attempt %d/%d)", config.ServiceURL, resp.StatusCode, retries+1, maxRetries)
+	// Send the event
+	result := rc.Client.Send(ctx, event)
+	if cloudevents.IsUndelivered(result) {
+		log.Printf("❌ Failed to send CloudEvent: %v", result)
+	} else {
+		log.Printf("✅ CloudEvent successfully sent to %s, result: %v", config.ServiceURL, result)
 	}
-	log.Printf("❌ Failed to forward request to %s after %d retries", config.ServiceURL, maxRetries)
 }
 
 // UpdateAdmissionRateFromRedis updates the admission rate and rate limiter based on the value received from Redis
