@@ -54,11 +54,13 @@ func ProcessBufferedRequests() {
 	for {
 		bufferCond.L.Lock()
 		for len(requestBuffer) == 0 {
+			log.Printf("⏳ Waiting for requests in the buffer...")
 			bufferCond.Wait() // Wait until a new request is added
 		}
 		requestBody := <-requestBuffer
 		bufferCond.L.Unlock()
 
+		log.Printf("🚚 Processing request from the buffer...")
 		rateController.ForwardRequest(requestBody)
 	}
 }
@@ -66,6 +68,7 @@ func ProcessBufferedRequests() {
 // AddRequestToBuffer adds an incoming request to the buffer for processing
 func AddRequestToBuffer(requestBody []byte) {
 	bufferCond.L.Lock()
+	log.Printf("📥 Adding request to buffer. Buffer size before adding: %d", len(requestBuffer))
 	requestBuffer <- requestBody
 	bufferCond.Signal() // Signal the processor that a new request is available
 	bufferCond.L.Unlock()
@@ -73,11 +76,13 @@ func AddRequestToBuffer(requestBody []byte) {
 
 // Initialize the rate controller
 func InitRateController(alpha, beta float64) {
+	log.Printf("🔧 Initializing RateController with alpha: %f, beta: %f", alpha, beta)
 	rateController = controller.NewRateController(alpha, beta)
 }
 
 // StartReceiver subscribes to the Redis channel for the specific service's admission rate and starts processing requests.
 func StartReceiver() {
+	log.Printf("🔌 Connecting to Redis at %s", config.RedisURL)
 	rdbClient = redis.NewClient(&redis.Options{
 		Addr:     config.RedisURL,
 		Password: config.RedisPass, // Redis password from env

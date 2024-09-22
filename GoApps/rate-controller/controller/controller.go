@@ -22,6 +22,7 @@ type RateController struct {
 // NewRateController initializes a new RateController with the given alpha and beta values
 func NewRateController(alpha, beta float64) *RateController {
 	initialRate := 1.0 // Initialize with a default admission rate
+	log.Printf("🔧 Creating RateLimiter with initial rate: %f", initialRate)
 	return &RateController{
 		admissionRate: initialRate,
 		Limiter:       rate.NewLimiter(rate.Limit(initialRate), 1), // Create a rate limiter
@@ -37,6 +38,8 @@ func (rc *RateController) ForwardRequest(requestBody []byte) {
 		log.Printf("⚠️ Error waiting on rate limiter: %v", err)
 		return
 	}
+
+	log.Printf("⏩ Forwarding request to %s", config.ServiceURL)
 
 	// Retry mechanism
 	const maxRetries = 3
@@ -68,9 +71,12 @@ func (rc *RateController) UpdateAdmissionRateFromRedis(newAdmissionRate float64)
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
+	log.Printf("📊 Updating admission rate to: %f", newAdmissionRate)
+
 	// Update the internal admission rate
 	rc.admissionRate = newAdmissionRate
 
 	// Update the rate limiter to use the new admission rate
 	rc.Limiter.SetLimit(rate.Limit(newAdmissionRate))
+	log.Printf("🔧 Rate limiter updated with new rate: %f", newAdmissionRate)
 }
