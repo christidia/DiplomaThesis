@@ -38,22 +38,29 @@ func (rc *RateController) ForwardRequest(requestBody []byte) {
 		return
 	}
 
-	// Prepare and send the request to the consuming service
-	req, err := http.NewRequest("POST", config.ServiceURL, bytes.NewBuffer(requestBody))
-	if err != nil {
-		log.Printf("❌ Error creating HTTP request: %v", err)
-		return
-	}
+	// Retry mechanism
+	const maxRetries = 3
+	for retries := 0; retries < maxRetries; retries++ {
+		req, err := http.NewRequest("POST", config.ServiceURL, bytes.NewBuffer(requestBody))
+		if err != nil {
+			log.Printf("❌ Error creating HTTP request: %v", err)
+			return
+		}
 
-	// Forward the request to the target service
-	resp, err := rc.Client.Do(req)
-	if err != nil {
-		log.Printf("❌ Error forwarding request to %s: %v", config.ServiceURL, err)
-		return
-	}
-	defer resp.Body.Close()
+		resp, err := rc.Client.Do(req)
+		if err != nil {
+			log.Printf("❌ Error forwarding request to %s: %v (attempt %d/%d)", config.ServiceURL, err, retries+1, maxRetries)
+			continue
+		}
+		defer resp.Body.Close()
 
-	log.Printf("✅ Successfully forwarded request to %s, response code: %d", config.ServiceURL, resp.StatusCode)
+		if resp.StatusCode == http.StatusOK {
+			log.Printf("✅ Successfully forwarded request to %s, response code: %d", config.ServiceURL, resp.StatusCode)
+			return
+		}
+		log.Printf("⚠️ Request to %s failed with response code: %d (attempt %d/%d)", config.ServiceURL, resp.StatusCode, retries+1, maxRetries)
+	}
+	log.Printf("❌ Failed to forward request to %s after %d retries", config.ServiceURL, maxRetries)
 }
 
 // UpdateAdmissionRateFromRedis updates the admission rate and rate limiter based on the value received from Redis

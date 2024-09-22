@@ -17,6 +17,7 @@ var (
 	rdbClient      *redis.Client
 	requestBuffer  = make(chan []byte, 100) // Buffer for storing incoming requests
 	wg             sync.WaitGroup
+	bufferCond     = sync.NewCond(&sync.Mutex{})
 )
 
 // Subscribe to the Redis channel for admission rate updates for the specific service.
@@ -50,14 +51,24 @@ func SubscribeToAdmissionRate(rdb *redis.Client) {
 
 // ProcessBufferedRequests listens for requests in the buffer and forwards them at the rate defined by the controller
 func ProcessBufferedRequests() {
-	for requestBody := range requestBuffer {
-		rateController.ForwardRequest(requestBody) // Forward each request at the rate limit
+	for {
+		bufferCond.L.Lock()
+		for len(requestBuffer) == 0 {
+			bufferCond.Wait() // Wait until a new request is added
+		}
+		requestBody := <-requestBuffer
+		bufferCond.L.Unlock()
+
+		rateController.ForwardRequest(requestBody)
 	}
 }
 
 // AddRequestToBuffer adds an incoming request to the buffer for processing
 func AddRequestToBuffer(requestBody []byte) {
+	bufferCond.L.Lock()
 	requestBuffer <- requestBody
+	bufferCond.Signal() // Signal the processor that a new request is available
+	bufferCond.L.Unlock()
 }
 
 // Initialize the rate controller
@@ -69,9 +80,16 @@ func InitRateController(alpha, beta float64) {
 func StartReceiver() {
 	rdbClient = redis.NewClient(&redis.Options{
 		Addr:     config.RedisURL,
-		Password: config.RedisPass, // No password set
-		DB:       0,                // Use default DB
+		Password: config.RedisPass, // Redis password from env
+		DB:       0,
 	})
+
+	// Test Redis connection
+	pong, err := rdbClient.Ping(context.Background()).Result()
+	if err != nil {
+		log.Fatalf("❌ Redis connection failed: %v", err)
+	}
+	log.Printf("✅ Redis connection successful: %s", pong)
 
 	// Subscribe to admission rate updates for the specific service
 	go SubscribeToAdmissionRate(rdbClient)

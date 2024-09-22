@@ -22,6 +22,13 @@ func StartMetricsServer() {
 		Addr:    ":9095",
 		Handler: mux,
 	}
+
+	// Health check endpoint for readiness probe
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
 	mux.Handle("/metrics", promhttp.Handler())
 	log.Printf("Prometheus metrics available at :9095/metrics")
 	log.Fatal(server.ListenAndServe())
