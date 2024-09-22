@@ -30,4 +30,7 @@ func main() {
 
 	// Start the event receiver and request processor
 	events.StartReceiver()
+
+	// Block main from exiting
+	select {} // This will keep the process running
 }
