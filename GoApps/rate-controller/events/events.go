@@ -22,7 +22,7 @@ var (
 
 // Subscribe to the Redis channel for admission rate updates for the specific service.
 func SubscribeToAdmissionRate(rdb *redis.Client) {
-	serviceName := config.ServiceName
+	serviceName := config.ThisService
 	pubSub := rdb.Subscribe(context.Background(), "admission_rate:"+serviceName)
 
 	if pubSub == nil {

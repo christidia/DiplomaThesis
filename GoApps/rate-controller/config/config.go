@@ -10,6 +10,7 @@ import (
 var (
 	UpdateInterval time.Duration
 	ServiceName    string
+	ThisService    string
 	Alpha          float64
 	Beta           float64
 	ServiceURL     string // URL for the consuming service
@@ -21,6 +22,7 @@ var (
 func LoadConfig() {
 	var err error
 
+	//Name of the Consuming Service
 	ServiceName = os.Getenv("SERVICE_NAME")
 	if ServiceName == "" {
 		log.Fatal("❌ SERVICE_NAME environment variable is not set")
@@ -29,6 +31,12 @@ func LoadConfig() {
 	ServiceURL = os.Getenv("SERVICE_URL")
 	if ServiceURL == "" {
 		log.Fatal("❌ SERVICE_URL environment variable is not set")
+	}
+
+	//Name of the admission controller service (this service)
+	ThisService = os.Getenv("ThisService")
+	if ThisService == "" {
+		log.Fatal("❌ ThisService environment variable is not set")
 	}
 
 	alphaStr := os.Getenv("ALPHA")
