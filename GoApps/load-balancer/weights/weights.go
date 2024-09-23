@@ -1,6 +1,7 @@
 package weights
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -129,17 +130,22 @@ func UpdateEmptyQWeightRoutine() {
 }
 
 func publishAdmissionRates(rdb *redis.Client) {
-	log.Println("PUBLISHING ADMISSION RATES TO REDIS")
+	log.Println("📢 PUBLISHING ADMISSION RATES TO REDIS")
 	for _, service := range db.ServicesMap {
 		admissionRate := float64(service.RawAdmissionRate)
+
+		// Convert admissionRate to a string before publishing
+		admissionRateStr := fmt.Sprintf("%f", admissionRate)
 		channel := "admission_rate:" + service.Name
-		err := rdb.Publish(db.Ctx, channel, admissionRate).Err()
+
+		err := rdb.Publish(db.Ctx, channel, admissionRateStr).Err() // Publish the string
 		if err != nil {
-			log.Printf("ERROR PUBLISHING ADMISSION RATE FOR SERVICE %s: %v", service.Name, err)
+			log.Printf("❌ ERROR PUBLISHING ADMISSION RATE FOR SERVICE %s: %v", service.Name, err)
 		} else {
-			log.Printf("PUBLISHED ADMISSION RATE FOR %s: %f", service.Name, admissionRate)
+			log.Printf("✅ PUBLISHED ADMISSION RATE FOR %s: %s", service.Name, admissionRateStr)
 		}
 	}
+	log.Println("📤 ALL ADMISSION RATES PUBLISHED SUCCESSFULLY!")
 }
 
 func normalizeWeights(rdb *redis.Client) {
