@@ -31,6 +31,8 @@ func SubscribeToAdmissionRate(rdb *redis.Client) {
 	ch := pubSub.Channel()
 	for msg := range ch {
 		admissionRateStr := msg.Payload
+
+		// Attempt to parse the admission rate
 		admissionRate, err := strconv.ParseFloat(admissionRateStr, 64)
 		if err != nil {
 			log.Printf("⚠️ Error parsing admission rate: %v", err)
