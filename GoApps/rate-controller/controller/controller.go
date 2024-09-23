@@ -15,7 +15,7 @@ type RateController struct {
 
 // NewRateController initializes a new RateController with the given alpha and beta values
 func NewRateController(alpha, beta float64) *RateController {
-	initialRate := 1.0 // Initialize with a default admission rate
+	initialRate := 10.0 // Initialize with a default admission rate
 	return &RateController{
 		admissionRate: initialRate,
 		Limiter:       rate.NewLimiter(rate.Limit(initialRate), 1), // Create a rate limiter

@@ -17,7 +17,7 @@ import (
 var (
 	rateController *controller.RateController
 	rdbClient      *redis.Client
-	httpClient     = &http.Client{}
+	//httpClient     = &http.Client{}
 )
 
 // Subscribe to the Redis channel for admission rate updates for the specific service.
@@ -25,11 +25,19 @@ func SubscribeToAdmissionRate(rdb *redis.Client) {
 	serviceName := config.ServiceName
 	pubSub := rdb.Subscribe(context.Background(), "admission_rate:"+serviceName)
 
+	if pubSub == nil {
+		log.Fatalf("❌ Failed to subscribe to admission_rate:%s channel", serviceName)
+	}
+
 	defer pubSub.Close() // Defer closing pubSub to ensure graceful shutdown
+
+	log.Printf("🔊 Subscribed to admission_rate:%s channel", serviceName)
 
 	// Listen for admission rate updates
 	ch := pubSub.Channel()
 	for msg := range ch {
+		log.Printf("📡 Received message from Redis Pub/Sub channel for %s: %s", serviceName, msg.Payload)
+
 		admissionRateStr := msg.Payload
 
 		// Attempt to parse the admission rate
