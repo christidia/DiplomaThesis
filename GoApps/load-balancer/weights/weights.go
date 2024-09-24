@@ -132,7 +132,7 @@ func UpdateEmptyQWeightRoutine() {
 func publishAdmissionRates(rdb *redis.Client) {
 	log.Println("📢 PUBLISHING ADMISSION RATES TO REDIS")
 	for _, service := range db.ServicesMap {
-		admissionRate := float64(service.RawAdmissionRate)
+		admissionRate := float64(service.CurrWeight)
 
 		// Convert admissionRate to a string before publishing
 		admissionRateStr := fmt.Sprintf("%f", admissionRate)
