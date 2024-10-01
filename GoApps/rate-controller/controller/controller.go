@@ -14,7 +14,7 @@ type RateController struct {
 }
 
 // NewRateController initializes a new RateController with the given alpha and beta values
-func NewRateController(alpha, beta float64) *RateController {
+func NewRateController() *RateController {
 	initialRate := 10.0 // Initialize with a default admission rate
 	return &RateController{
 		admissionRate: initialRate,

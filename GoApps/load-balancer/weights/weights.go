@@ -13,9 +13,20 @@ import (
 )
 
 var (
-	maxAdmissionRate = 100
-	minAdmissionRate = config.MinAdmissionRate
+	maxAdmissionRate int
+	minAdmissionRate int
 )
+
+func InitializeWeights() {
+	// Call LoadConfig() to load env variables
+	config.LoadConfig()
+
+	// Set minAdmissionRate from the loaded config
+	minAdmissionRate = config.MinAdmissionRate
+	maxAdmissionRate = config.MaxAdmissionRate
+
+	log.Printf("📋 Admission Rate Config: min=%d, max=%d", minAdmissionRate, maxAdmissionRate)
+}
 
 func InitializeTkIfNotExists(rdb *redis.Client) error {
 	// Always initialize tk to the current time minus 0.1 seconds

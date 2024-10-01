@@ -41,7 +41,7 @@ func LoadConfig() {
 
 	alphaStr := os.Getenv("ALPHA")
 	if alphaStr == "" {
-		Alpha = 0.1
+		Alpha = 1
 	} else {
 		Alpha, err = strconv.ParseFloat(alphaStr, 64)
 		if err != nil {

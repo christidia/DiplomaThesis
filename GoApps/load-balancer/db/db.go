@@ -68,13 +68,16 @@ func InitializeServices(rdb *redis.Client) {
 		name := fmt.Sprintf("service%d", i+1)
 		service := &Service{
 			Name:             name,
-			CurrWeight:       10 * (i + 1), // Initial CurrWeight (used for routing, will be normalized)
-			EmptyQWeight:     10 + i,       // Initial EmptyQWeight (baseline for AIMD)
-			RawAdmissionRate: 10 + i,       // Smaller Initial Admission Rate (e.g., 1-10)
-			Beta:             0.5,          // AIMD multiplicative decrease factor
-			Alpha:            3 + i,        // AIMD additive increase factor
+			CurrWeight:       config.InitialCurrWeights[i],   // Use the loaded value from config
+			EmptyQWeight:     config.InitialEmptyQWeights[i], // Use the loaded value from config
+			RawAdmissionRate: config.RawAdmissionRates[i],    // Use the loaded value from config
+			Beta:             config.Betas[i],                // Use the loaded value from config
+			Alpha:            config.Alphas[i],               // Use the loaded value from config
 		}
+
 		ServicesMap[service.Name] = service
+
+		// Save the initialized values to Redis
 		if err := SaveServiceToRedis(rdb, service); err != nil {
 			log.Fatalf("❌ Error saving service %s to Redis: %v", service.Name, err)
 		}

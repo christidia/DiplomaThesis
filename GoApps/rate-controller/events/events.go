@@ -94,8 +94,8 @@ func forwardEventToService(ctx context.Context, event cloudevents.Event) cloudev
 }
 
 // Initialize the rate controller
-func InitRateController(alpha, beta float64) {
-	rateController = controller.NewRateController(alpha, beta)
+func InitRateController() {
+	rateController = controller.NewRateController()
 }
 
 // StartReceiver initializes the CloudEvents receiver and subscribes to admission rate updates.

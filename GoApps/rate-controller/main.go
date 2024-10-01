@@ -1,9 +1,6 @@
 package main
 
 import (
-	"os"
-	"strconv"
-
 	"rate-controller/config"
 	"rate-controller/events"
 	"rate-controller/metrics"
@@ -12,18 +9,8 @@ import (
 func main() {
 	config.LoadConfig()
 
-	alpha, err := strconv.ParseFloat(os.Getenv("ALPHA"), 64)
-	if err != nil {
-		alpha = 3
-	}
-
-	beta, err := strconv.ParseFloat(os.Getenv("BETA"), 64)
-	if err != nil {
-		beta = 0.5
-	}
-
 	// Initialize Rate Controller
-	events.InitRateController(alpha, beta)
+	events.InitRateController()
 
 	// Start the metrics server
 	go metrics.StartMetricsServer()

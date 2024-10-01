@@ -20,6 +20,7 @@ func main() {
 
 	// Load configurations
 	config.LoadConfig()
+	weights.InitializeWeights()
 
 	// Initialize Redis client
 	rdb := db.NewRedisClient()
