@@ -69,10 +69,11 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 		log.Printf("CALCULATED RAW ADMISSION RATE FOR %s: %d", service.Name, rawRate)
 
 		// Ensure the admission rate is within the logical bounds
-		if rawRate > maxAdmissionRate {
-			rawRate = maxAdmissionRate
-			log.Printf("RAW ADMISSION RATE FOR %s EXCEEDED MAX LIMIT, SET TO: %d", service.Name, maxAdmissionRate)
-		} else if rawRate < minAdmissionRate {
+		// if rawRate > maxAdmissionRate {
+		// 	rawRate = maxAdmissionRate
+		// 	log.Printf("RAW ADMISSION RATE FOR %s EXCEEDED MAX LIMIT, SET TO: %d", service.Name, maxAdmissionRate)
+		// } else if rawRate < minAdmissionRate {
+		if rawRate < minAdmissionRate {
 			rawRate = minAdmissionRate
 			log.Printf("RAW ADMISSION RATE FOR %s FELL BELOW MIN LIMIT, SET TO: %d", service.Name, minAdmissionRate)
 		}
