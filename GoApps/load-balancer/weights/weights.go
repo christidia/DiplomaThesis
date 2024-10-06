@@ -169,7 +169,7 @@ func normalizeWeights(rdb *redis.Client) {
 		return
 	}
 
-	normalizationFactor := 100.0 / float64(totalWeight)
+	normalizationFactor := 1000.0 / float64(totalWeight)
 	roundedWeights := make(map[string]int)
 	totalRoundedWeight := 0
 
@@ -181,7 +181,7 @@ func normalizeWeights(rdb *redis.Client) {
 		log.Printf("NORMALIZED WEIGHT FOR %s: %d", service.Name, roundedWeight)
 	}
 
-	roundingError := 100 - totalRoundedWeight
+	roundingError := 1000 - totalRoundedWeight
 
 	for _, service := range db.ServicesMap {
 		if roundingError == 0 {
