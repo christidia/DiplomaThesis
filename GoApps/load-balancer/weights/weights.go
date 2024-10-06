@@ -61,8 +61,10 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 
 	for _, service := range db.ServicesMap {
 		log.Printf("UPDATING RAW ADMISSION RATE FOR SERVICE: %s", service.Name)
+		replicas := metrics.FetchReplicaNum(service.Name)
+		replicas = max(replicas, 1)
 		// Apply AIMD on the raw admission rate with `EmptyQWeight` as the baseline
-		rawRate := int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
+		rawRate := int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*replicas
 
 		log.Printf("CALCULATED RAW ADMISSION RATE FOR %s: %d", service.Name, rawRate)
 
