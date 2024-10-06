@@ -56,38 +56,42 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 	elapsedTime := currentTime.Sub(time.Unix(tk, 0)).Seconds()
 	log.Printf("ELAPSED TIME SINCE TK: %f SECONDS", elapsedTime)
 
-	for _, service := range db.ServicesMap {
-		log.Printf("UPDATING ADMISSION RATE FOR SERVICE: %s", service.Name)
-		// Apply AIMD on the admission rate with `EmptyQWeight` as the baseline
-		admissionRate := int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
+	// Store the raw admission rates before normalizing for routing
+	admissionRates := make(map[string]int)
 
-		log.Printf("CALCULATED ADMISSION RATE FOR %s: %d", service.Name, admissionRate)
+	for _, service := range db.ServicesMap {
+		log.Printf("UPDATING RAW ADMISSION RATE FOR SERVICE: %s", service.Name)
+		// Apply AIMD on the raw admission rate with `EmptyQWeight` as the baseline
+		rawRate := int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*metrics.FetchReplicaNum(service.Name)
+
+		log.Printf("CALCULATED RAW ADMISSION RATE FOR %s: %d", service.Name, rawRate)
 
 		// Ensure the admission rate is within the logical bounds
-		if admissionRate > maxAdmissionRate {
-			admissionRate = maxAdmissionRate
-			log.Printf("ADMISSION RATE FOR %s EXCEEDED MAX LIMIT, SET TO: %d", service.Name, maxAdmissionRate)
-		} else if admissionRate < minAdmissionRate {
-			admissionRate = minAdmissionRate
-			log.Printf("ADMISSION RATE FOR %s FELL BELOW MIN LIMIT, SET TO: %d", service.Name, minAdmissionRate)
+		if rawRate > maxAdmissionRate {
+			rawRate = maxAdmissionRate
+			log.Printf("RAW ADMISSION RATE FOR %s EXCEEDED MAX LIMIT, SET TO: %d", service.Name, maxAdmissionRate)
+		} else if rawRate < minAdmissionRate {
+			rawRate = minAdmissionRate
+			log.Printf("RAW ADMISSION RATE FOR %s FELL BELOW MIN LIMIT, SET TO: %d", service.Name, minAdmissionRate)
 		}
 
-		service.CurrWeight = admissionRate
+		service.RawAdmissionRate = rawRate
+		admissionRates[service.Name] = service.RawAdmissionRate
 
-		// Save the updated admission rate in Redis for the respective service
-		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
+		// Save the raw admission rate in Redis for the respective service
+		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "raw_admission_rate", service.RawAdmissionRate).Err()
 		if err != nil {
-			log.Printf("ERROR UPDATING ADMISSION RATE FOR SERVICE %s IN REDIS: %v", service.Name, err)
+			log.Printf("ERROR UPDATING RAW ADMISSION RATE FOR SERVICE %s IN REDIS: %v", service.Name, err)
 		} else {
-			log.Printf("UPDATED ADMISSION RATE FOR %s: %d", service.Name, service.CurrWeight)
+			log.Printf("UPDATED RAW ADMISSION RATE FOR %s: %d", service.Name, service.RawAdmissionRate)
 		}
 	}
 
-	// Normalize the admission rates for routing
-	normalizeWeights(rdb)
-
-	// Publish the normalized admission rates for admission controllers
+	// Publish raw admission rates for admission controllers
 	publishAdmissionRates(rdb)
+
+	// Normalize the raw admission rates for routing
+	normalizeWeights(rdb)
 
 	log.Println("COMPLETED ADMISSION RATE UPDATE")
 }
@@ -112,8 +116,7 @@ func createEmptyQueueEvent(rdb *redis.Client, currentTime time.Time) {
 
 		for _, service := range db.ServicesMap {
 			log.Printf("UPDATING EMPTY QUEUE WEIGHT FOR SERVICE: %s", service.Name)
-			service.EmptyQWeight = service.CurrWeight // Set the EmptyQWeight to the current admission rate
-
+			service.EmptyQWeight = service.RawAdmissionRate
 			err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "emptyq_weight", service.EmptyQWeight).Err()
 			if err != nil {
 				log.Printf("ERROR UPDATING EMPTYQ WEIGHT FOR SERVICE %s IN REDIS: %v", service.Name, err)
@@ -138,7 +141,7 @@ func UpdateEmptyQWeightRoutine() {
 }
 
 func publishAdmissionRates(rdb *redis.Client) {
-	log.Println("📢 PUBLISHING NORMALIZED ADMISSION RATES TO REDIS")
+	log.Println("📢 PUBLISHING ADMISSION RATES TO REDIS")
 	for _, service := range db.ServicesMap {
 		admissionRate := float64(service.CurrWeight)
 
@@ -161,7 +164,7 @@ func normalizeWeights(rdb *redis.Client) {
 
 	totalWeight := 0
 	for _, service := range db.ServicesMap {
-		totalWeight += service.CurrWeight
+		totalWeight += service.RawAdmissionRate
 	}
 
 	if totalWeight == 0 {
@@ -169,19 +172,19 @@ func normalizeWeights(rdb *redis.Client) {
 		return
 	}
 
-	normalizationFactor := 1000.0 / float64(totalWeight)
+	normalizationFactor := 100.0 / float64(totalWeight)
 	roundedWeights := make(map[string]int)
 	totalRoundedWeight := 0
 
 	for _, service := range db.ServicesMap {
-		normalizedWeight := float64(service.CurrWeight) * normalizationFactor
+		normalizedWeight := float64(service.RawAdmissionRate) * normalizationFactor
 		roundedWeight := int(normalizedWeight)
 		roundedWeights[service.Name] = roundedWeight
 		totalRoundedWeight += roundedWeight
 		log.Printf("NORMALIZED WEIGHT FOR %s: %d", service.Name, roundedWeight)
 	}
 
-	roundingError := 1000 - totalRoundedWeight
+	roundingError := 100 - totalRoundedWeight
 
 	for _, service := range db.ServicesMap {
 		if roundingError == 0 {
@@ -198,9 +201,9 @@ func normalizeWeights(rdb *redis.Client) {
 
 		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
 		if err != nil {
-			log.Printf("ERROR UPDATING NORMALIZED WEIGHT FOR SERVICE %s IN REDIS: %v", service.Name, err)
+			log.Printf("ERROR UPDATING CURR WEIGHT FOR SERVICE %s IN REDIS: %v", service.Name, err)
 		} else {
-			log.Printf("UPDATED NORMALIZED WEIGHT FOR %s: %d", service.Name, service.CurrWeight)
+			log.Printf("UPDATED CURR WEIGHT FOR %s: %d", service.Name, service.CurrWeight)
 		}
 	}
 
