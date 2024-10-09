@@ -38,6 +38,11 @@ func init() {
 	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 }
 
+// Helper function to convert internal service names to external service names
+func externalServiceName(service string) string {
+	return strings.Replace(service, "service", "consumer-service-", 1)
+}
+
 func StartMetricsServer() {
 	mux := http.NewServeMux()
 	server := &http.Server{
@@ -71,8 +76,9 @@ func FetchQdReqs() map[string]int {
 }
 
 func FetchReplicas(service string) int {
-	replicas := FetchReplicaNum(service)
-	log.Printf("🖇️ Number of Replicas for %s: %d", service, replicas)
+	externalName := externalServiceName(service)
+	replicas := FetchReplicaNum(externalName)
+	log.Printf("🖇️ Number of Replicas for %s (%s): %d", service, externalName, replicas)
 	return replicas
 }
 
@@ -108,7 +114,6 @@ func fetchAndStoreMetrics(services []string, metricType string, metrics map[stri
 							log.Printf("Error parsing metric value for %s: %v", endpoint, err)
 						} else {
 							totalQueuedRequests += value
-							//log.Printf("📥 Queued Requests for %s: %d", endpoint, value)
 						}
 					}
 				}
@@ -138,11 +143,10 @@ func FetchReplicaNum(service string) int {
 
 // Function to fetch service endpoints
 func fetchServiceEndpoints(service string) ([]string, error) {
+	externalName := externalServiceName(service)
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		kubeconfig := filepath.Join(
-			homeDir(), ".kube", "config",
-		)
+		kubeconfig := filepath.Join(homeDir(), ".kube", "config")
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			return nil, err
@@ -155,7 +159,7 @@ func fetchServiceEndpoints(service string) ([]string, error) {
 	}
 
 	pods, err := clientset.CoreV1().Pods("rabbitmq-setup").List(context.TODO(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("service=%s,app=event-display", service),
+		LabelSelector: fmt.Sprintf("service=%s,app=event-display", externalName),
 	})
 	if err != nil {
 		return nil, err
