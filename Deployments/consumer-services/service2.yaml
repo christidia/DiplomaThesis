@@ -1,0 +1,43 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: consumer-service-2
+  namespace: rabbitmq-setup
+spec:
+  template:
+    metadata:
+      labels:
+        app: event-display
+        service: consumer-service-2
+      annotations:
+        #autoscaling.knative.dev/target-utilization-percentage: "60"
+      #   autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "2"
+        autoscaling.knative.dev/metric: "concurrency"
+        autoscaling.knative.dev/target: "0.8"
+      #   autoscaling.knative.dev/scale-to-zero: "true"
+      #   autoscaling.knative.dev/scale-up-rate: "10.0"
+      #   autoscaling.knative.dev/panic-window: "10s"
+      #   autoscaling.knative.dev/panic-threshold-percentage: "200"  # More aggressive scaling
+    spec:
+      #containerConcurrency: 2
+
+      containers:
+        - image: christinedia/event-consumer:display3 #opencv4   #third
+          env:
+            - name: SERVICE_NAME
+              value: "consumer-service-2"
+            - name: QUEUE_SIZE
+              value: "4"
+            - name: NUM_WORKERS
+              value: "1"
+          resources:
+            limits:
+              cpu: "1200m"       # 2 CPU cores
+              memory: "3Gi"      # 4 GiB
+            requests:
+              cpu: "1000m"        # CPU that triggers scaling
+              memory: "2Gi"      # 3 GiB
+  traffic:
+    - latestRevision: true
+      percent: 100
