@@ -16,9 +16,9 @@ import (
 type AIMDRoutingAlgorithm struct{}
 
 // Helper function to generate prefix sums
-func generatePrefixSums(servicesMap map[string]*rdb.Service) []int {
-	prefixSums := make([]int, len(servicesMap))
-	sum := 0
+func generatePrefixSums(servicesMap map[string]*rdb.Service) []float64 {
+	prefixSums := make([]float64, len(servicesMap))
+	sum := 0.0
 	index := 0
 	for _, service := range servicesMap {
 		sum += service.CurrWeight
@@ -29,7 +29,7 @@ func generatePrefixSums(servicesMap map[string]*rdb.Service) []int {
 }
 
 // Binary search to find the appropriate service based on the random value
-func binarySearch(prefixSums []int, randomValue int) int {
+func binarySearch(prefixSums []float64, randomValue float64) int {
 	return sort.Search(len(prefixSums), func(i int) bool {
 		return prefixSums[i] > randomValue
 	})
@@ -42,11 +42,11 @@ func (a *AIMDRoutingAlgorithm) RouteEvent(event cloudevents.Event, servicesMap m
 	totalWeight := prefixSums[len(prefixSums)-1]
 
 	// Log the prefix sums and total weight
-	log.Printf("🧮 Prefix sums: %v, Total weight: %d", prefixSums, totalWeight)
+	log.Printf("🧮 Prefix sums: %v, Total weight: %.2f", prefixSums, totalWeight)
 
-	// Generate a random value between 0 and the total sum of weights
-	randomValue := rand.Intn(totalWeight)
-	log.Printf("🎲 Generated random value: %d", randomValue)
+	// Generate a random float64 value between 0 and the total sum of weights
+	randomValue := rand.Float64() * totalWeight
+	log.Printf("🎲 Generated random value: %.2f", randomValue)
 
 	// Use binary search to find the selected service index
 	selectedIndex := binarySearch(prefixSums, randomValue)
