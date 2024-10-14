@@ -100,51 +100,58 @@ func normalizeWeights(rdb *redis.Client) {
 	log.Println("⚖️ STARTING WEIGHT NORMALIZATION")
 
 	totalWeight := 0
-	totalUtilizationFactor := 0.0
+	totalResourceUtilization := 0.0
+	anyColdStart := false // Flag to detect if any service is in cold start
 
-	// Calculate total weight and total CPU utilization for normalization
+	// Calculate total weight and total resource utilization for normalization
 	for _, service := range db.ServicesMap {
 		totalWeight += service.CurrWeight
+		cpuUsage := metrics.FetchCPUUsage(service.Name)
 
-		// Fetch CPU utilization and CPU limit for each replica
-		cpuUtilization := metrics.FetchCPUUsage(service.Name)
-		cpuLimit := metrics.FetchCPULimit(service.Name)
-
-		utilizationRatio := 0.0
-		if cpuLimit > 0 {
-			utilizationRatio = cpuUtilization / cpuLimit
+		// If any service has zero CPU usage, we mark it as a cold start
+		if cpuUsage == 0 {
+			anyColdStart = true
 		}
 
-		totalUtilizationFactor += utilizationRatio
+		totalResourceUtilization += cpuUsage // We only use CPU utilization for this case
+		log.Printf("📈 CPU Usage for %s: %f", service.Name, cpuUsage)
 	}
 
+	// Check if we should perform simple normalization (due to cold start)
+	if anyColdStart {
+		log.Println("⚠️ Cold start detected. Performing simple normalization without resource utilization adjustment.")
+		performSimpleNormalization(rdb, totalWeight)
+		return
+	}
+
+	// Perform resource-based normalization if there is no cold start
 	if totalWeight == 0 {
-		log.Println("ERROR: TOTAL WEIGHT IS ZERO, CANNOT NORMALIZE")
+		log.Println("⚠️ ERROR: TOTAL WEIGHT IS ZERO, CANNOT NORMALIZE")
+		return
+	}
+
+	if totalResourceUtilization == 0 {
+		log.Println("⚠️ ERROR: TOTAL RESOURCE UTILIZATION IS ZERO, CANNOT NORMALIZE WITH RESOURCES")
 		return
 	}
 
 	normalizationFactor := 100.0 / float64(totalWeight)
+	weightedNormalizationFactor := totalResourceUtilization / float64(totalWeight)
+
+	roundedWeights := make(map[string]float64) // Store rounded values as float64
 	totalRoundedWeight := 0.0
-	roundedWeights := make(map[string]float64)
 
 	for _, service := range db.ServicesMap {
-		// Normalize weights based on CPU utilization and limits
-		cpuUtilization := metrics.FetchCPUUsage(service.Name)
-		cpuLimit := metrics.FetchCPULimit(service.Name)
-		utilizationRatio := 0.0
-
-		if cpuLimit > 0 {
-			utilizationRatio = cpuUtilization / cpuLimit
-		}
-
-		normalizedWeight := float64(service.CurrWeight) * normalizationFactor * utilizationRatio
-		roundedWeight := math.Round(normalizedWeight*100) / 100
+		// Normalize weights considering resource utilization
+		normalizedWeight := (float64(service.CurrWeight) * normalizationFactor) * weightedNormalizationFactor
+		roundedWeight := math.Round(normalizedWeight*100) / 100 // Round to 2 decimal places
 		roundedWeights[service.Name] = roundedWeight
 		totalRoundedWeight += roundedWeight
 		log.Printf("🔄 NORMALIZED WEIGHT FOR %s CONSIDERING RESOURCES: %.2f", service.Name, roundedWeight)
 	}
 
 	roundingError := 100.0 - totalRoundedWeight
+
 	for _, service := range db.ServicesMap {
 		if roundingError == 0 {
 			break
@@ -156,17 +163,63 @@ func normalizeWeights(rdb *redis.Client) {
 	}
 
 	for _, service := range db.ServicesMap {
-		service.CurrWeight = int(roundedWeights[service.Name])
+		// Convert back to integer or floating-point representation based on the weight usage in Redis
+		service.CurrWeight = int(math.Round(roundedWeights[service.Name])) // Use rounded to 2 decimals for precision
 
 		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
 		if err != nil {
-			log.Printf("ERROR UPDATING NORMALIZED WEIGHT FOR SERVICE %s IN REDIS: %v", service.Name, err)
+			log.Printf("❌ ERROR UPDATING NORMALIZED WEIGHT FOR SERVICE %s IN REDIS: %v", service.Name, err)
 		} else {
 			log.Printf("✅ UPDATED NORMALIZED WEIGHT FOR %s: %d", service.Name, service.CurrWeight)
 		}
 	}
 
 	log.Println("✔️ COMPLETED WEIGHT NORMALIZATION")
+}
+
+func performSimpleNormalization(rdb *redis.Client, totalWeight int) {
+	// Simple normalization (ignore resource utilization, just use current weights)
+	if totalWeight == 0 {
+		log.Println("⚠️ ERROR: TOTAL WEIGHT IS ZERO, CANNOT NORMALIZE")
+		return
+	}
+
+	normalizationFactor := 100.0 / float64(totalWeight)
+	roundedWeights := make(map[string]float64)
+	totalRoundedWeight := 0.0
+
+	for _, service := range db.ServicesMap {
+		normalizedWeight := float64(service.CurrWeight) * normalizationFactor
+		roundedWeight := math.Round(normalizedWeight*100) / 100 // Round to 2 decimal places
+		roundedWeights[service.Name] = roundedWeight
+		totalRoundedWeight += roundedWeight
+		log.Printf("🔄 NORMALIZED WEIGHT FOR %s (Simple): %.2f", service.Name, roundedWeight)
+	}
+
+	roundingError := 100.0 - totalRoundedWeight
+
+	for _, service := range db.ServicesMap {
+		if roundingError == 0 {
+			break
+		}
+		if roundedWeights[service.Name] > 0 && roundingError > 0.01 {
+			roundedWeights[service.Name] += 0.01
+			roundingError -= 0.01
+		}
+	}
+
+	for _, service := range db.ServicesMap {
+		service.CurrWeight = int(math.Round(roundedWeights[service.Name]))
+
+		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
+		if err != nil {
+			log.Printf("❌ ERROR UPDATING NORMALIZED WEIGHT FOR SERVICE %s IN REDIS: %v", service.Name, err)
+		} else {
+			log.Printf("✅ UPDATED NORMALIZED WEIGHT FOR %s: %d", service.Name, service.CurrWeight)
+		}
+	}
+
+	log.Println("✔️ COMPLETED SIMPLE WEIGHT NORMALIZATION")
 }
 
 func updateTkInRedis(rdb *redis.Client, currentTime time.Time) {
