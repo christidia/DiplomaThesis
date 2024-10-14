@@ -101,11 +101,16 @@ func normalizeWeights(rdb *redis.Client) {
 
 	totalWeight := 0
 	totalResourceUtilization := 0.0
+	replicasExist := false
 
 	// Calculate total weight and total resource utilization for normalization
 	for _, service := range db.ServicesMap {
+		replicas := metrics.FetchReplicaNum(service.Name)
+		if replicas > 0 {
+			replicasExist = true
+			totalResourceUtilization += metrics.FetchResourceUtilization(service.Name) // Fetch CPU/memory utilization only if replicas exist
+		}
 		totalWeight += service.CurrWeight
-		totalResourceUtilization += metrics.FetchResourceUtilization(service.Name) // Assume this fetches CPU/memory utilization
 	}
 
 	if totalWeight == 0 {
@@ -114,14 +119,21 @@ func normalizeWeights(rdb *redis.Client) {
 	}
 
 	normalizationFactor := 100.0 / float64(totalWeight)
-	weightedNormalizationFactor := totalResourceUtilization / float64(totalWeight)
+
+	// If replicas exist, we normalize based on resource utilization
+	weightedNormalizationFactor := 1.0
+	if replicasExist {
+		weightedNormalizationFactor = totalResourceUtilization / float64(totalWeight)
+	} else {
+		log.Println("No replicas detected, performing normalization without resource utilization adjustment")
+	}
 
 	roundedWeights := make(map[string]float64) // Store rounded values as float64
 	totalRoundedWeight := 0.0
 
 	for _, service := range db.ServicesMap {
-		// Normalize weights considering resource utilization
-		normalizedWeight := (float64(service.CurrWeight) * normalizationFactor) * weightedNormalizationFactor
+		// Normalize weights considering resource utilization if replicas exist
+		normalizedWeight := float64(service.CurrWeight) * normalizationFactor * weightedNormalizationFactor
 		roundedWeight := math.Round(normalizedWeight*100) / 100 // Round to 2 decimal places
 		roundedWeights[service.Name] = roundedWeight
 		totalRoundedWeight += roundedWeight
