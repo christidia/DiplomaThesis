@@ -3,7 +3,6 @@ package weights
 import (
 	"fmt"
 	"log"
-	"math"
 	"time"
 
 	"load-balancer/config"
@@ -61,17 +60,17 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 		log.Printf("UPDATING ADMISSION RATE FOR SERVICE: %s", service.Name)
 		replicas := metrics.FetchReplicaNum(service.Name)
 		replicas = max(1, replicas)
-
 		// Apply AIMD on the admission rate with `EmptyQWeight` as the baseline
 		admissionRate := int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*replicas
 
 		log.Printf("CALCULATED ADMISSION RATE FOR %s: %d", service.Name, admissionRate)
 
 		// Ensure the admission rate is within the logical bounds
-		if admissionRate > maxAdmissionRate {
-			admissionRate = maxAdmissionRate
-			log.Printf("ADMISSION RATE FOR %s EXCEEDED MAX LIMIT, SET TO: %d", service.Name, maxAdmissionRate)
-		} else if admissionRate < minAdmissionRate {
+		// if admissionRate > maxAdmissionRate {
+		// 	admissionRate = maxAdmissionRate
+		// 	log.Printf("ADMISSION RATE FOR %s EXCEEDED MAX LIMIT, SET TO: %d", service.Name, maxAdmissionRate)
+		// } else
+		if admissionRate < minAdmissionRate {
 			admissionRate = minAdmissionRate
 			log.Printf("ADMISSION RATE FOR %s FELL BELOW MIN LIMIT, SET TO: %d", service.Name, minAdmissionRate)
 		}
@@ -87,72 +86,13 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 		}
 	}
 
-	// Normalize the admission rates for routing, considering resource utilization
+	// Normalize the admission rates for routing
 	normalizeWeights(rdb)
 
 	// Publish the normalized admission rates for admission controllers
 	publishAdmissionRates(rdb)
 
 	log.Println("COMPLETED ADMISSION RATE UPDATE")
-}
-
-func normalizeWeights(rdb *redis.Client) {
-	log.Println("STARTING WEIGHT NORMALIZATION")
-
-	totalWeight := 0
-	totalResourceUtilization := 0.0
-
-	// Calculate total weight and total resource utilization for normalization
-	for _, service := range db.ServicesMap {
-		totalWeight += service.CurrWeight
-		totalResourceUtilization += metrics.FetchResourceUtilization(service.Name) // Assume this fetches CPU/memory utilization
-	}
-
-	if totalWeight == 0 {
-		log.Println("ERROR: TOTAL WEIGHT IS ZERO, CANNOT NORMALIZE")
-		return
-	}
-
-	normalizationFactor := 100.0 / float64(totalWeight)
-	weightedNormalizationFactor := totalResourceUtilization / float64(totalWeight)
-
-	roundedWeights := make(map[string]float64) // Store rounded values as float64
-	totalRoundedWeight := 0.0
-
-	for _, service := range db.ServicesMap {
-		// Normalize weights considering resource utilization
-		normalizedWeight := (float64(service.CurrWeight) * normalizationFactor) * weightedNormalizationFactor
-		roundedWeight := math.Round(normalizedWeight*100) / 100 // Round to 2 decimal places
-		roundedWeights[service.Name] = roundedWeight
-		totalRoundedWeight += roundedWeight
-		log.Printf("NORMALIZED WEIGHT FOR %s CONSIDERING RESOURCES: %.2f", service.Name, roundedWeight)
-	}
-
-	roundingError := 100.0 - totalRoundedWeight
-
-	for _, service := range db.ServicesMap {
-		if roundingError == 0 {
-			break
-		}
-		if roundedWeights[service.Name] > 0 && roundingError > 0.01 {
-			roundedWeights[service.Name] += 0.01
-			roundingError -= 0.01
-		}
-	}
-
-	for _, service := range db.ServicesMap {
-		// Convert back to integer or floating-point representation based on the weight usage in Redis
-		service.CurrWeight = int(math.Round(roundedWeights[service.Name])) // Use rounded to 2 decimals for precision
-
-		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
-		if err != nil {
-			log.Printf("ERROR UPDATING NORMALIZED WEIGHT FOR SERVICE %s IN REDIS: %v", service.Name, err)
-		} else {
-			log.Printf("UPDATED NORMALIZED WEIGHT FOR %s: %d", service.Name, service.CurrWeight)
-		}
-	}
-
-	log.Println("COMPLETED WEIGHT NORMALIZATION")
 }
 
 func updateTkInRedis(rdb *redis.Client, currentTime time.Time) {
@@ -217,4 +157,55 @@ func publishAdmissionRates(rdb *redis.Client) {
 		}
 	}
 	log.Println("📤 ALL ADMISSION RATES PUBLISHED SUCCESSFULLY!")
+}
+
+func normalizeWeights(rdb *redis.Client) {
+	log.Println("STARTING WEIGHT NORMALIZATION")
+
+	totalWeight := 0
+	for _, service := range db.ServicesMap {
+		totalWeight += service.CurrWeight
+	}
+
+	if totalWeight == 0 {
+		log.Println("ERROR: TOTAL WEIGHT IS ZERO, CANNOT NORMALIZE")
+		return
+	}
+
+	normalizationFactor := 100.0 / float64(totalWeight)
+	roundedWeights := make(map[string]int)
+	totalRoundedWeight := 0
+
+	for _, service := range db.ServicesMap {
+		normalizedWeight := float64(service.CurrWeight) * normalizationFactor
+		roundedWeight := int(normalizedWeight)
+		roundedWeights[service.Name] = roundedWeight
+		totalRoundedWeight += roundedWeight
+		log.Printf("NORMALIZED WEIGHT FOR %s: %d", service.Name, roundedWeight)
+	}
+
+	roundingError := 100 - totalRoundedWeight
+
+	for _, service := range db.ServicesMap {
+		if roundingError == 0 {
+			break
+		}
+		if roundedWeights[service.Name] > 0 {
+			roundedWeights[service.Name]++
+			roundingError--
+		}
+	}
+
+	for _, service := range db.ServicesMap {
+		service.CurrWeight = roundedWeights[service.Name]
+
+		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
+		if err != nil {
+			log.Printf("ERROR UPDATING NORMALIZED WEIGHT FOR SERVICE %s IN REDIS: %v", service.Name, err)
+		} else {
+			log.Printf("UPDATED NORMALIZED WEIGHT FOR %s: %d", service.Name, service.CurrWeight)
+		}
+	}
+
+	log.Println("COMPLETED WEIGHT NORMALIZATION")
 }

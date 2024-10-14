@@ -11,22 +11,17 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
-	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/model"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"load-balancer/db"
-
-	"github.com/prometheus/client_golang/api"
 )
 
 var (
@@ -199,68 +194,4 @@ func UpdateGamma() {
 		UpdateMetric(service.Name, float64(gamma))
 		log.Printf("🔢 Gamma for %s: %f", service.Name, gamma)
 	}
-}
-
-// Fetch CPU and memory utilization for a given service
-func FetchResourceUtilization(service string) float64 {
-	cpuUsage := fetchCPUUsage(service)
-	memoryUsage := fetchMemoryUsage(service)
-	totalUtilization := cpuUsage + memoryUsage
-	log.Printf("📊 Total Resource Utilization for %s: CPU: %f, Memory: %f", service, cpuUsage, memoryUsage)
-	return totalUtilization
-}
-
-// Fetch CPU usage using Prometheus metrics
-func fetchCPUUsage(service string) float64 {
-	// Prometheus query for CPU usage
-	query := fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{cpu="total", namespace="rabbitmq-setup", pod=~"%s.*"}[1m])) by (container)`, externalServiceName(service))
-	cpuUsage := executePrometheusQuery(query)
-	log.Printf("📈 CPU Usage for %s: %f", service, cpuUsage)
-	return cpuUsage
-}
-
-// Fetch Memory usage using Prometheus metrics
-func fetchMemoryUsage(service string) float64 {
-	// Prometheus query for memory usage
-	query := fmt.Sprintf(`sum(container_memory_usage_bytes{namespace="rabbitmq-setup", pod=~"%s.*"}) by (container)`, externalServiceName(service))
-	memoryUsage := executePrometheusQuery(query)
-	log.Printf("📊 Memory Usage for %s: %f", service, memoryUsage)
-	return memoryUsage
-}
-
-// Function to execute Prometheus query and return the result
-func executePrometheusQuery(query string) float64 {
-	// Set up Prometheus client
-	client, err := api.NewClient(api.Config{
-		Address: "http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",
-	})
-	if err != nil {
-		log.Printf("Error creating Prometheus client: %v", err)
-		return 0
-	}
-
-	v1api := v1.NewAPI(client)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Execute query
-	result, warnings, err := v1api.Query(ctx, query, time.Now())
-	if err != nil {
-		log.Printf("Error executing Prometheus query: %v", err)
-		return 0
-	}
-
-	// Handle warnings if any
-	if len(warnings) > 0 {
-		log.Printf("Warnings from Prometheus: %v", warnings)
-	}
-
-	// Process result
-	if result.Type() == model.ValVector {
-		vector := result.(model.Vector)
-		if len(vector) > 0 {
-			return float64(vector[0].Value)
-		}
-	}
-	return 0
 }
