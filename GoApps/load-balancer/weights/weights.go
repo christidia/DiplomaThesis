@@ -97,47 +97,52 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 }
 
 func normalizeWeights(rdb *redis.Client) {
-	log.Println("STARTING WEIGHT NORMALIZATION")
+	log.Println("⚖️ STARTING WEIGHT NORMALIZATION")
 
 	totalWeight := 0
 	totalResourceUtilization := 0.0
-	replicasExist := false
+	validMetrics := false
 
 	// Calculate total weight and total resource utilization for normalization
 	for _, service := range db.ServicesMap {
-		replicas := metrics.FetchReplicaNum(service.Name)
-		if replicas > 0 {
-			replicasExist = true
-			totalResourceUtilization += metrics.FetchResourceUtilization(service.Name) // Fetch CPU/memory utilization only if replicas exist
-		}
 		totalWeight += service.CurrWeight
+
+		// Fetch resource utilization (CPU/memory)
+		resourceUtilization := metrics.FetchResourceUtilization(service.Name)
+
+		// Check if valid metrics are fetched (both CPU and memory should be non-zero)
+		if resourceUtilization > 0 {
+			validMetrics = true
+			totalResourceUtilization += resourceUtilization
+		}
 	}
 
 	if totalWeight == 0 {
-		log.Println("ERROR: TOTAL WEIGHT IS ZERO, CANNOT NORMALIZE")
+		log.Println("❌ ERROR: TOTAL WEIGHT IS ZERO, CANNOT NORMALIZE")
 		return
 	}
 
 	normalizationFactor := 100.0 / float64(totalWeight)
 
-	// If replicas exist, we normalize based on resource utilization
+	// If valid metrics exist, we normalize based on resource utilization
 	weightedNormalizationFactor := 1.0
-	if replicasExist {
+	if validMetrics && totalResourceUtilization > 0 {
 		weightedNormalizationFactor = totalResourceUtilization / float64(totalWeight)
+		log.Println("✅ Valid resource utilization metrics available, normalizing with resource utilization adjustment")
 	} else {
-		log.Println("No replicas detected, performing normalization without resource utilization adjustment")
+		log.Println("⚠️ No valid resource utilization metrics available, normalizing without resource utilization adjustment")
 	}
 
 	roundedWeights := make(map[string]float64) // Store rounded values as float64
 	totalRoundedWeight := 0.0
 
 	for _, service := range db.ServicesMap {
-		// Normalize weights considering resource utilization if replicas exist
+		// Normalize weights considering resource utilization only if valid metrics are present
 		normalizedWeight := float64(service.CurrWeight) * normalizationFactor * weightedNormalizationFactor
 		roundedWeight := math.Round(normalizedWeight*100) / 100 // Round to 2 decimal places
 		roundedWeights[service.Name] = roundedWeight
 		totalRoundedWeight += roundedWeight
-		log.Printf("NORMALIZED WEIGHT FOR %s CONSIDERING RESOURCES: %.2f", service.Name, roundedWeight)
+		log.Printf("🔄 NORMALIZED WEIGHT FOR %s CONSIDERING RESOURCES: %.2f", service.Name, roundedWeight)
 	}
 
 	roundingError := 100.0 - totalRoundedWeight
@@ -158,13 +163,13 @@ func normalizeWeights(rdb *redis.Client) {
 
 		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
 		if err != nil {
-			log.Printf("ERROR UPDATING NORMALIZED WEIGHT FOR SERVICE %s IN REDIS: %v", service.Name, err)
+			log.Printf("❌ ERROR UPDATING NORMALIZED WEIGHT FOR SERVICE %s IN REDIS: %v", service.Name, err)
 		} else {
-			log.Printf("UPDATED NORMALIZED WEIGHT FOR %s: %d", service.Name, service.CurrWeight)
+			log.Printf("✅ UPDATED NORMALIZED WEIGHT FOR %s: %d", service.Name, service.CurrWeight)
 		}
 	}
 
-	log.Println("COMPLETED WEIGHT NORMALIZATION")
+	log.Println("✔️ COMPLETED WEIGHT NORMALIZATION")
 }
 
 func updateTkInRedis(rdb *redis.Client, currentTime time.Time) {
