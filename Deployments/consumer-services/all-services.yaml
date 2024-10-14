@@ -1,0 +1,113 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: consumer-service-1
+  namespace: rabbitmq-setup
+spec:
+  template:
+    metadata:
+      labels:
+        app: event-display
+        service: consumer-service-1
+      annotations:
+        autoscaling.knative.dev/maxScale: "3"
+        autoscaling.knative.dev/metric: "concurrency"
+        autoscaling.knative.dev/target: "0.8"
+    spec:
+      containers:
+        - image: christinedia/event-consumer:display3 #opencv4   #third
+          env:
+            - name: SERVICE_NAME
+              value: "consumer-service-1"
+            - name: QUEUE_SIZE
+              value: "2"
+            - name: NUM_WORKERS
+              value: "1"
+          resources:
+            limits:
+              cpu: "1000m"       # 4 CPU cores
+              memory: "2048Mi"    # 2.2 GiB
+            requests:
+              cpu: "1000m"        # 2 CPU cores
+              memory: "2048Mi"    # 1.7 GiB
+  traffic:
+    - latestRevision: true
+      percent: 100
+
+---
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: consumer-service-2
+  namespace: rabbitmq-setup
+spec:
+  template:
+    metadata:
+      labels:
+        app: event-display
+        service: consumer-service-2
+      annotations:
+        autoscaling.knative.dev/maxScale: "2"
+        autoscaling.knative.dev/metric: "concurrency"
+        autoscaling.knative.dev/target: "0.8"
+  
+    spec:
+      containers:
+        - image: christinedia/event-consumer:display3 #opencv4   #third
+          env:
+            - name: SERVICE_NAME
+              value: "consumer-service-2"
+            - name: QUEUE_SIZE
+              value: "4"
+            - name: NUM_WORKERS
+              value: "1"
+          resources:
+            limits:
+              cpu: "1200m"       # 2 CPU cores
+              memory: "3Gi"      # 4 GiB
+            requests:
+              cpu: "1000m"        # CPU that triggers scaling
+              memory: "2Gi"      # 3 GiB
+  traffic:
+    - latestRevision: true
+      percent: 100
+
+---
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: consumer-service-3
+  namespace: rabbitmq-setup
+spec:
+  template:
+    metadata:
+      labels:
+        app: event-display
+        service: consumer-service-3
+      annotations:
+          autoscaling.knative.dev/maxScale: "2"
+          autoscaling.knative.dev/metric: "concurrency"
+          autoscaling.knative.dev/target: "1"
+    spec:
+      containers:
+        - image: christinedia/event-consumer:display3   #third
+          env:
+            - name: SERVICE_NAME
+              value: "consumer-service-3"
+            - name: QUEUE_SIZE
+              value: "5"
+            - name: NUM_WORKERS
+              value: "2"
+          resources:
+            limits:
+              cpu: "2000m"       # 4 CPU cores
+              memory: "5Gi"    # 2.2 GiB
+            requests:
+              cpu: "1500m"        # 2 CPU cores
+              memory: "3.5Gi"    # 1.7 GiB
+
+  traffic:
+    - latestRevision: true
+      percent: 100
