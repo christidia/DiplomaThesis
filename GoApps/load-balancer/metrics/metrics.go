@@ -201,31 +201,16 @@ func UpdateGamma() {
 	}
 }
 
-// Fetch CPU and memory utilization for a given service
-func FetchResourceUtilization(service string) float64 {
-	cpuUsage := fetchCPUUsage(service)
-	memoryUsage := fetchMemoryUsage(service)
-	totalUtilization := cpuUsage + memoryUsage
-	log.Printf("📊 Total Resource Utilization for %s: CPU: %f, Memory: %f", service, cpuUsage, memoryUsage)
-	return totalUtilization
+// Fetch CPU usage using Prometheus metrics for all replicas of a service
+func FetchCPUUsage(service string) float64 {
+	query := fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{namespace="$namespace", pod=~"%s-deployment-.*", container=""}[1m]))`, service)
+	return executePrometheusQuery(query)
 }
 
-// Fetch CPU usage using Prometheus metrics
-func fetchCPUUsage(service string) float64 {
-	// Prometheus query for CPU usage
-	query := fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{cpu="total", namespace="rabbitmq-setup", pod=~"%s.*"}[1m])) by (container)`, externalServiceName(service))
-	cpuUsage := executePrometheusQuery(query)
-	log.Printf("📈 CPU Usage for %s: %f", service, cpuUsage)
-	return cpuUsage
-}
-
-// Fetch Memory usage using Prometheus metrics
-func fetchMemoryUsage(service string) float64 {
-	// Prometheus query for memory usage
-	query := fmt.Sprintf(`sum(container_memory_usage_bytes{namespace="rabbitmq-setup", pod=~"%s.*"}) by (container)`, externalServiceName(service))
-	memoryUsage := executePrometheusQuery(query)
-	log.Printf("📊 Memory Usage for %s: %f", service, memoryUsage)
-	return memoryUsage
+// Fetch CPU request limits for all replicas of a service
+func FetchCPULimit(service string) float64 {
+	query := fmt.Sprintf(`sum(kube_pod_container_resource_requests{resource="cpu", namespace="$namespace", pod=~"%s-deployment-.*"})`, service)
+	return executePrometheusQuery(query)
 }
 
 // Function to execute Prometheus query and return the result
