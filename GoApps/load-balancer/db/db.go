@@ -18,9 +18,9 @@ var (
 
 type Service struct {
 	Name             string
-	RawAdmissionRate int // Raw value used for AIMD and admission controllers
-	CurrWeight       int // Normalized value used for routing
-	EmptyQWeight     int // Baseline value for raw admission rate when queue is empty
+	RawAdmissionRate float64 // Raw value used for AIMD and admission controllers
+	CurrWeight       float64 // Normalized value used for routing
+	EmptyQWeight     float64 // Baseline value for raw admission rate when queue is empty
 	Beta             float64
 	Alpha            int
 }

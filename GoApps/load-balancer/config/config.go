@@ -23,9 +23,9 @@ var (
 	MinAdmissionRate      int
 
 	// Maps for service-specific parameters
-	InitialCurrWeights   = make(map[int]int)
-	InitialEmptyQWeights = make(map[int]int)
-	RawAdmissionRates    = make(map[int]int)
+	InitialCurrWeights   = make(map[int]float64)
+	InitialEmptyQWeights = make(map[int]float64)
+	RawAdmissionRates    = make(map[int]float64)
 	Alphas               = make(map[int]int)
 	Betas                = make(map[int]float64)
 )
@@ -121,30 +121,30 @@ func LoadConfig() {
 
 		// Load Initial CurrWeight
 		currWeightStr := os.Getenv(fmt.Sprintf("SERVICE%d_INITIAL_CURR_WEIGHT", serviceIndex+1)) // Use serviceIndex + 1 for environment variable name
-		currWeight, err := strconv.Atoi(currWeightStr)
+		currWeight, err := strconv.ParseFloat(currWeightStr, 64)
 		if err != nil || currWeight <= 0 {
 			log.Printf("⚠️ Invalid or missing value for SERVICE%d_INITIAL_CURR_WEIGHT. Using default: %d", serviceIndex+1, 10*(serviceIndex+1))
-			InitialCurrWeights[serviceIndex] = 10 * (serviceIndex + 1)
+			InitialCurrWeights[serviceIndex] = float64(10 * (serviceIndex + 1))
 		} else {
 			InitialCurrWeights[serviceIndex] = currWeight
 		}
 
 		// Load Initial EmptyQWeight
 		emptyQWeightStr := os.Getenv(fmt.Sprintf("SERVICE%d_INITIAL_EMPTYQ_WEIGHT", serviceIndex+1))
-		emptyQWeight, err := strconv.Atoi(emptyQWeightStr)
+		emptyQWeight, err := strconv.ParseFloat(emptyQWeightStr, 64)
 		if err != nil || emptyQWeight <= 0 {
 			log.Printf("⚠️ Invalid or missing value for SERVICE%d_INITIAL_EMPTYQ_WEIGHT. Using default: %d", serviceIndex+1, 10+(serviceIndex+1)-1)
-			InitialEmptyQWeights[serviceIndex] = 10 + (serviceIndex + 1) - 1
+			InitialEmptyQWeights[serviceIndex] = float64(10 + (serviceIndex + 1) - 1)
 		} else {
 			InitialEmptyQWeights[serviceIndex] = emptyQWeight
 		}
 
 		// Load Raw Admission Rate
 		rawAdmissionRateStr := os.Getenv(fmt.Sprintf("SERVICE%d_RAW_ADMISSION_RATE", serviceIndex+1))
-		rawAdmissionRate, err := strconv.Atoi(rawAdmissionRateStr)
+		rawAdmissionRate, err := strconv.ParseFloat(rawAdmissionRateStr, 64)
 		if err != nil || rawAdmissionRate <= 0 {
 			log.Printf("⚠️ Invalid or missing value for SERVICE%d_RAW_ADMISSION_RATE. Using default: %d", serviceIndex+1, 10+(serviceIndex+1)-1)
-			RawAdmissionRates[serviceIndex] = 10 + (serviceIndex + 1) - 1
+			RawAdmissionRates[serviceIndex] = float64(10 + (serviceIndex + 1) - 1)
 		} else {
 			RawAdmissionRates[serviceIndex] = rawAdmissionRate
 		}

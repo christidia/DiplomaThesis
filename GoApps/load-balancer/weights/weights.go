@@ -63,7 +63,7 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 		replicas = max(1, replicas)
 
 		// Apply AIMD on the admission rate with `EmptyQWeight` as the baseline
-		admissionRate := int(service.Beta*float64(service.EmptyQWeight)) + service.Alpha*int(elapsedTime)*replicas
+		admissionRate := service.Beta*float64(service.EmptyQWeight) + float64(service.Alpha*int(elapsedTime)*replicas)
 
 		log.Printf("CALCULATED ADMISSION RATE FOR %s: %d", service.Name, admissionRate)
 
@@ -99,7 +99,7 @@ func UpdateAdmissionRates(rdb *redis.Client, currentTime time.Time) {
 func normalizeWeights(rdb *redis.Client) {
 	log.Println("⚖️ STARTING WEIGHT NORMALIZATION")
 
-	totalWeight := 0
+	totalWeight := 0.0
 	totalResourceUtilization := 0.0
 	anyColdStart := false // Flag to detect if any service is in cold start
 
@@ -164,7 +164,7 @@ func normalizeWeights(rdb *redis.Client) {
 
 	for _, service := range db.ServicesMap {
 		// Convert back to integer or floating-point representation based on the weight usage in Redis
-		service.CurrWeight = int(math.Round(roundedWeights[service.Name])) // Use rounded to 2 decimals for precision
+		service.CurrWeight = roundedWeights[service.Name]
 
 		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
 		if err != nil {
@@ -177,7 +177,7 @@ func normalizeWeights(rdb *redis.Client) {
 	log.Println("✔️ COMPLETED WEIGHT NORMALIZATION")
 }
 
-func performSimpleNormalization(rdb *redis.Client, totalWeight int) {
+func performSimpleNormalization(rdb *redis.Client, totalWeight float64) {
 	// Simple normalization (ignore resource utilization, just use current weights)
 	if totalWeight == 0 {
 		log.Println("⚠️ ERROR: TOTAL WEIGHT IS ZERO, CANNOT NORMALIZE")
@@ -209,7 +209,7 @@ func performSimpleNormalization(rdb *redis.Client, totalWeight int) {
 	}
 
 	for _, service := range db.ServicesMap {
-		service.CurrWeight = int(math.Round(roundedWeights[service.Name]))
+		service.CurrWeight = roundedWeights[service.Name]
 
 		err := rdb.HSet(db.Ctx, db.ServiceKeyPrefix+service.Name, "curr_weight", service.CurrWeight).Err()
 		if err != nil {
