@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mservice-metrics-monitor
+  namespace: rabbitmq-setup
+spec:
+  selector:
+    matchLabels:
+      app: mservice-metrics-2112
+  endpoints:
+  - port: metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    path: /metrics
+

@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: consumer-metrics-monitor
+  namespace: rabbitmq-setup
+spec:
+  selector:
+    matchLabels:
+      app: consumer-metrics
+  endpoints:
+  - port: metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    path: /metrics

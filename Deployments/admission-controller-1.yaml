@@ -1,0 +1,45 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: service1
+  namespace: rabbitmq-setup
+spec:
+  template:
+    metadata:
+      labels:
+        app: admission-controller
+        service: service1
+      annotations:
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "1"
+    spec:
+      containers:
+        - image: christinedia/controller:second
+          env:
+            - name: ThisService
+              value: "service1"
+            - name: SERVICE_NAME
+              value: "consumer-service-1"
+            - name: SERVICE_URL
+              value: "http://consumer-service-1.rabbitmq-setup.svc.cluster.local"
+            - name: REDIS_URL
+              value: "my-redis-master.rabbitmq-setup.svc.cluster.local:6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: my-redis
+                  key: redis-password
+          # Add readiness and liveness probes
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9095
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+  traffic:
+    - latestRevision: true
+      percent: 100
+

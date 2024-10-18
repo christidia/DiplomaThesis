@@ -13,7 +13,7 @@ spec:
         autoscaling.knative.dev/maxScale: "1"
     spec:
       containers:
-        - image: christinedia/routing:controller2 #controller    
+        - image: christinedia/routing:new                #routing:final      
           env:
             - name: REDIS_URL
               value: "my-redis-master.rabbitmq-setup.svc.cluster.local:6379"
@@ -38,9 +38,43 @@ spec:
                   key: password
             - name: CHECK_INTERVAL
               value: "1000"
+            - name: SERVICE1_INITIAL_CURR_WEIGHT
+              value: "23"
+            - name: SERVICE1_INITIAL_EMPTYQ_WEIGHT
+              value: "23"
+            - name: SERVICE1_RAW_ADMISSION_RATE
+              value: "23"
+            - name: SERVICE1_ALPHA
+              value: "3"
+            - name: SERVICE1_BETA
+              value: "0.5"
+            - name: SERVICE2_INITIAL_CURR_WEIGHT
+              value: "27"
+            - name: SERVICE2_INITIAL_EMPTYQ_WEIGHT
+              value: "27"
+            - name: SERVICE2_RAW_ADMISSION_RATE
+              value: "27"
+            - name: SERVICE2_ALPHA
+              value: "4"
+            - name: SERVICE2_BETA
+              value: "0.5"
+            - name: SERVICE3_INITIAL_CURR_WEIGHT
+              value: "50"
+            - name: SERVICE3_INITIAL_EMPTYQ_WEIGHT
+              value: "50"
+            - name: SERVICE3_RAW_ADMISSION_RATE
+              value: "50"
+            - name: SERVICE3_ALPHA
+              value: "7"
+            - name: SERVICE3_BETA
+              value: "0.5"
+            - name: MAX_ADMISSION_RATE
+              value: "100"
+
           readinessProbe:
             successThreshold: 1
             tcpSocket:
               port: 8080
           ports:
             - containerPort: 8080
+            

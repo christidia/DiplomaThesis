@@ -10,12 +10,13 @@ spec:
         app: event-display
         service: consumer-service-1
       annotations:
+        autoscaling.knative.dev/class: "hpa.autoscaling.knative.dev"
+        autoscaling.knative.dev/metric: "cpu"
+        autoscaling.knative.dev/target: "75"   # Setting the CPU target to 75%
         autoscaling.knative.dev/maxScale: "3"
-        autoscaling.knative.dev/metric: "concurrency"
-        autoscaling.knative.dev/target: "0.8"
     spec:
       containers:
-        - image: christinedia/event-consumer:display3 #opencv4   #third
+        - image: christinedia/event-consumer:display3 #opencv4
           env:
             - name: SERVICE_NAME
               value: "consumer-service-1"
@@ -25,11 +26,11 @@ spec:
               value: "1"
           resources:
             limits:
-              cpu: "1000m"       # 4 CPU cores
+              cpu: "1000m"       # 1 CPU core
               memory: "2048Mi"    # 2.2 GiB
             requests:
-              cpu: "1000m"        # 2 CPU cores
-              memory: "2048Mi"    # 1.7 GiB
+              cpu: "1000m"        # 1 CPU core
+              memory: "2048Mi"    # 2 GiB
   traffic:
     - latestRevision: true
       percent: 100
@@ -48,13 +49,13 @@ spec:
         app: event-display
         service: consumer-service-2
       annotations:
+        autoscaling.knative.dev/class: "hpa.autoscaling.knative.dev"
+        autoscaling.knative.dev/metric: "cpu"
+        autoscaling.knative.dev/target: "75"   # Setting the CPU target to 75%
         autoscaling.knative.dev/maxScale: "2"
-        autoscaling.knative.dev/metric: "concurrency"
-        autoscaling.knative.dev/target: "0.8"
-  
     spec:
       containers:
-        - image: christinedia/event-consumer:display3 #opencv4   #third
+        - image: christinedia/event-consumer:display3 #opencv4
           env:
             - name: SERVICE_NAME
               value: "consumer-service-2"
@@ -64,11 +65,11 @@ spec:
               value: "1"
           resources:
             limits:
-              cpu: "1200m"       # 2 CPU cores
-              memory: "3Gi"      # 4 GiB
+              cpu: "1200m"       # 1.2 CPU cores
+              memory: "3Gi"      # 3 GiB
             requests:
-              cpu: "1000m"        # CPU that triggers scaling
-              memory: "2Gi"      # 3 GiB
+              cpu: "1000m"       # 1 CPU core
+              memory: "2Gi"      # 2 GiB
   traffic:
     - latestRevision: true
       percent: 100
@@ -87,12 +88,13 @@ spec:
         app: event-display
         service: consumer-service-3
       annotations:
-          autoscaling.knative.dev/maxScale: "2"
-          autoscaling.knative.dev/metric: "concurrency"
-          autoscaling.knative.dev/target: "0.8"
+        autoscaling.knative.dev/class: "hpa.autoscaling.knative.dev"
+        autoscaling.knative.dev/metric: "cpu"
+        autoscaling.knative.dev/target: "75"   # Setting the CPU target to 75%
+        autoscaling.knative.dev/maxScale: "2"
     spec:
       containers:
-        - image: christinedia/event-consumer:display3   #third
+        - image: christinedia/event-consumer:display3 #opencv4
           env:
             - name: SERVICE_NAME
               value: "consumer-service-3"
@@ -102,12 +104,11 @@ spec:
               value: "2"
           resources:
             limits:
-              cpu: "2000m"       # 4 CPU cores
-              memory: "5Gi"    # 2.2 GiB
+              cpu: "2000m"       # 2 CPU cores
+              memory: "5Gi"      # 5 GiB
             requests:
-              cpu: "1500m"        # 2 CPU cores
-              memory: "3.5Gi"    # 1.7 GiB
-
+              cpu: "1500m"       # 1.5 CPU cores
+              memory: "3.5Gi"    # 3.5 GiB
   traffic:
     - latestRevision: true
       percent: 100
