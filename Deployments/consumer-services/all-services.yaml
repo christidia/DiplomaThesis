@@ -89,7 +89,7 @@ spec:
       annotations:
           autoscaling.knative.dev/maxScale: "2"
           autoscaling.knative.dev/metric: "concurrency"
-          autoscaling.knative.dev/target: "1"
+          autoscaling.knative.dev/target: "0.8"
     spec:
       containers:
         - image: christinedia/event-consumer:display3   #third
