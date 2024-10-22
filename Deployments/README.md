@@ -113,5 +113,5 @@ MAX_ADMISSION_RATE: "100"
 - Apply the service configuration in Kubernetes:
 
 ```
-kubectl apply -f load-balancer.yaml
+kubectl apply -f loadbalancer.yaml
 ```
