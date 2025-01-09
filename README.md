@@ -1,4 +1,4 @@
-# Diploma Thesis: Custom Load Balancer in Knative Environment
+# Custom Load Balancer in Knative Environment
 
 This repository contains the complete implementation for the system described in the diploma thesis titled **"Custom Load Balancer in a Serverless Distributed System using Knative"**. The project explores dynamic process scheduling, admission control, and load balancing within a Knative-based environment. The primary focus is the development and evaluation of a custom load balancer that utilizes the Additive Increase Multiplicative Decrease (AIMD) algorithm, integrated with Knative, Redis, and RabbitMQ to handle dynamic traffic patterns efficiently.
 
