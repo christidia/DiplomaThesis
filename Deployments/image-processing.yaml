@@ -1,0 +1,18 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: image-processing
+  namespace: rabbitmq-setup
+  labels:
+    serving.knative.dev/visibility: "external"
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"  # Ensure at least 1 instance is always running
+    spec:
+      containers:
+        - image: christinedia/image-processing
+          ports:
+            - containerPort: 8080
+
